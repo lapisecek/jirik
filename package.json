@@ -1,0 +1,14 @@
+{
+  "name": "aiko-local",
+  "productName": "Aiko",
+  "version": "1.0.0",
+  "description": "Aiko – místní AI pomocnice s hlasem Jirka, která umí ovládat tento počítač",
+  "main": "app/main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^45.3.2"
+  }
+}

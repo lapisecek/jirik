@@ -1,0 +1,17 @@
+# prostředí a závislosti (vytvoří Setup.bat)
+.venv/
+node_modules/
+*.egg-info/
+__pycache__/
+*.pyc
+
+# data běhu: logy, historie agenta, paměť, cache
+data/
+
+# hlasový model (63 MB, stáhne Setup.bat)
+voices/*.onnx
+voices/*.onnx.json
+
+# sestavení
+dist/
+out/

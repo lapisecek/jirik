@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aiko</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%234f6bed'/><circle cx='16' cy='16' r='6' fill='white'/></svg>">
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --ink: #15171a; --mute: #6b7280; --line: #e6e8ec;
+    --accent: #4f6bed; --accent-ink: #ffffff; --accent-soft: #eef1fd; --aiko: #ffffff; --ok: #1f9d55; --warn: #d97706;
+    --bad: #dc2626; --shadow: 0 1px 2px rgba(16,24,40,.05), 0 4px 16px rgba(16,24,40,.06); --radius: 18px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0f1115; --panel: #171a20; --ink: #e9ebef; --mute: #9aa1ad; --line: #262a33; --accent: #6d84ff;
+            --accent-soft: #1d2340; --aiko: #1c2027; --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 20px rgba(0,0,0,.25); }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { background: var(--bg); color: var(--ink); font: 16px/1.5 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+         -webkit-font-smoothing: antialiased; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+
+  /* --- úvodní načítání --- */
+  #boot { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; background: var(--bg);
+          transition: opacity .45s ease, visibility .45s; }
+  #boot.gone { opacity: 0; visibility: hidden; }
+  .boot-inner { display: flex; flex-direction: column; align-items: center; gap: 18px; color: var(--mute); }
+  .orb { width: 64px; height: 64px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #8aa0ff, var(--accent));
+         box-shadow: 0 0 0 0 rgba(79,107,237,.45); animation: pulse 1.8s ease-out infinite; }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(79,107,237,.45); transform: scale(.96); }
+                     70% { box-shadow: 0 0 0 22px rgba(79,107,237,0); transform: scale(1); }
+                     100% { box-shadow: 0 0 0 0 rgba(79,107,237,0); transform: scale(.96); } }
+
+  /* --- rozvržení --- */
+  .app { height: 100%; display: flex; flex-direction: column; max-width: 860px; margin: 0 auto; }
+  header { display: flex; align-items: center; gap: 10px; padding: 14px 20px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 650; font-size: 18px; flex: 1; letter-spacing: -.01em; }
+  .brand .mini-orb { width: 26px; height: 26px; border-radius: 50%;
+                     background: radial-gradient(circle at 35% 30%, #8aa0ff, var(--accent)); transition: transform .3s; }
+  .brand.busy .mini-orb { animation: breathe 1.4s ease-in-out infinite; }
+  @keyframes breathe { 50% { transform: scale(.82); opacity: .75; } }
+  .chip { display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px; border-radius: 999px;
+          border: 1px solid var(--line); background: var(--panel); font-size: 13px; color: var(--mute); white-space: nowrap;
+          transition: border-color .2s, color .2s, background .2s; }
+  .chip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--bad); transition: background .3s; }
+  .chip.ok .dot { background: var(--ok); }
+  .chip.wait .dot { background: var(--warn); animation: blink 1s ease-in-out infinite; }
+  @keyframes blink { 50% { opacity: .3; } }
+  button.chip:hover { border-color: var(--accent); color: var(--ink); }
+  button.chip:active { transform: scale(.97); }
+  .icon-btn { width: 36px; height: 32px; padding: 0; justify-content: center; }
+  .icon-btn svg { width: 17px; height: 17px; }
+  .icon-btn.off { opacity: .55; }
+  .spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent;
+          animation: rot .7s linear infinite; display: inline-block; }
+  @keyframes rot { to { transform: rotate(360deg); } }
+
+  #log { flex: 1; overflow-y: auto; padding: 8px 20px 24px; display: flex; flex-direction: column; gap: 14px;
+         scroll-behavior: smooth; }
+  .row { display: flex; animation: rise .32s cubic-bezier(.2,.8,.2,1) both; }
+  .row.me { justify-content: flex-end; }
+  @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  .bubble { max-width: min(78%, 620px); padding: 11px 16px; border-radius: var(--radius); white-space: pre-wrap;
+            word-wrap: break-word; position: relative; }
+  .me .bubble { background: var(--accent); color: var(--accent-ink); border-bottom-right-radius: 6px; }
+  .aiko .bubble { background: var(--aiko); border: 1px solid var(--line); box-shadow: var(--shadow);
+                  border-bottom-left-radius: 6px; }
+  .bubble ol { margin: 8px 0 0; padding-left: 20px; }
+  .bubble li { margin: 3px 0; }
+  .bubble.speaking::after { content: ""; position: absolute; right: -26px; bottom: 6px; width: 16px; height: 14px;
+    background: linear-gradient(var(--accent),var(--accent)) 0 100%/3px 40% no-repeat,
+                linear-gradient(var(--accent),var(--accent)) 6px 100%/3px 90% no-repeat,
+                linear-gradient(var(--accent),var(--accent)) 12px 100%/3px 60% no-repeat;
+    animation: eq .9s ease-in-out infinite; }
+  @keyframes eq { 0%,100% { background-size: 3px 40%, 3px 90%, 3px 60%; }
+                  33% { background-size: 3px 90%, 3px 40%, 3px 80%; }
+                  66% { background-size: 3px 60%, 3px 70%, 3px 30%; } }
+  .note { align-self: center; font-size: 13px; color: var(--mute); padding: 4px 12px; border-radius: 999px;
+          background: var(--panel); border: 1px solid var(--line); animation: rise .3s ease both; }
+  .note.err { color: var(--bad); }
+
+  /* přemýšlí / pracuje */
+  .typing .bubble { display: flex; align-items: center; gap: 12px; color: var(--mute); }
+  .dots { display: inline-flex; gap: 4px; }
+  .dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); opacity: .35;
+            animation: hop 1.2s ease-in-out infinite; }
+  .dots i:nth-child(2) { animation-delay: .15s; } .dots i:nth-child(3) { animation-delay: .3s; }
+  @keyframes hop { 0%,60%,100% { transform: none; opacity: .35; } 30% { transform: translateY(-5px); opacity: 1; } }
+  .typing .status { font-size: 14px; transition: opacity .2s; }
+  .typing .secs { font-size: 12px; opacity: .7; font-variant-numeric: tabular-nums; }
+
+  .quick { display: flex; gap: 8px; margin-top: 2px; animation: rise .3s ease both; }
+  .quick button { border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 7px 18px;
+                  transition: background .15s, border-color .15s, transform .1s; }
+  .quick button:hover { border-color: var(--accent); background: var(--accent-soft); }
+  .quick button:active { transform: scale(.96); }
+
+  /* úvod */
+  .hello { margin: auto 0; text-align: center; padding: 24px 0; animation: rise .5s ease both; }
+  .hello h2 { font-size: 28px; font-weight: 650; margin: 14px 0 6px; letter-spacing: -.02em; }
+  .hello p { color: var(--mute); margin: 0 0 22px; }
+  .hello .orb { margin: 0 auto; width: 52px; height: 52px; }
+  .ideas { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; text-align: left; }
+  .ideas button { border: 1px solid var(--line); background: var(--panel); border-radius: 14px; padding: 12px 14px;
+                  text-align: left; box-shadow: var(--shadow); transition: transform .15s, border-color .15s; }
+  .ideas button:hover { transform: translateY(-2px); border-color: var(--accent); }
+  .ideas b { display: block; font-weight: 600; font-size: 14px; }
+  .ideas span { font-size: 13px; color: var(--mute); }
+
+  /* vstup */
+  .composer { padding: 10px 20px 20px; }
+  .box { display: flex; align-items: flex-end; gap: 8px; background: var(--panel); border: 1px solid var(--line);
+         border-radius: 20px; padding: 8px 8px 8px 16px; box-shadow: var(--shadow); transition: border-color .2s, box-shadow .2s; }
+  .box:focus-within { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+  textarea { flex: 1; border: 0; outline: 0; resize: none; background: transparent; color: var(--ink); font: inherit;
+             padding: 7px 0; max-height: 160px; line-height: 1.45; overflow-y: hidden; }
+  textarea.scroll { overflow-y: auto; }
+  .send, .stop { width: 40px; height: 40px; border-radius: 50%; border: 0; display: grid; place-items: center;
+                 transition: transform .12s, opacity .2s, background .2s; flex: none; }
+  .send { background: var(--accent); color: #fff; }
+  .send:disabled { opacity: .35; cursor: default; }
+  .send:not(:disabled):active, .stop:active { transform: scale(.92); }
+  .stop { background: transparent; color: var(--bad); border: 1px solid var(--line); display: none; }
+  .stop.on { display: grid; animation: rise .2s ease both; }
+  .send svg, .stop svg { width: 18px; height: 18px; }
+  .hint { text-align: center; font-size: 12px; color: var(--mute); margin-top: 8px; }
+
+  /* v aplikaci (Electron): záhlaví je zároveň lišta okna, vpravo jsou systémová tlačítka */
+  .electron-app header { -webkit-app-region: drag; min-height: 56px; padding-top: 8px; padding-bottom: 8px;
+                         padding-right: 150px; user-select: none; }
+  .electron-app header button, .electron-app header .chip { -webkit-app-region: no-drag; }
+  .electron-app #startAll { display: none; }
+  .electron-app .app { max-width: none; }
+  .electron-app #log, .electron-app .composer { width: 100%; max-width: 860px; margin-left: auto; margin-right: auto; }
+
+  @media (max-width: 600px) { header { padding: 10px 14px; } #log { padding: 8px 14px 20px; }
+                              .composer { padding: 8px 14px 14px; } #modelChip { display: none; }
+                              .bubble { max-width: 88%; } }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<div id="boot"><div class="boot-inner"><div class="orb"></div><div id="bootText">Spouštím Aiko…</div></div></div>
+
+<div class="app">
+  <header>
+    <div class="brand" id="brand"><div class="mini-orb"></div>Aiko</div>
+    <span class="chip" id="modelChip" title="Model, který odpovídá"><span class="dot"></span><span id="modelText">model</span></span>
+    <span class="chip" id="pcChip" title="Ovládání tohoto počítače"><span class="dot"></span><span id="pcText">počítač</span></span>
+    <button class="chip" id="startAll" title="Spustí model (Ollama) a ovládání počítače, pokud neběží">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 3v8"/><path d="M6.3 7.2a8 8 0 1 0 11.4 0"/></svg>
+      <span>Spustit vše</span>
+    </button>
+    <button class="chip icon-btn" id="voiceBtn" title="Hlas Jirka – zapnout / vypnout">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4z"/><path id="waves" d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>
+    </button>
+  </header>
+
+  <div id="log"></div>
+
+  <div class="composer">
+    <form class="box" id="form">
+      <textarea id="text" rows="1" placeholder="Napište, s čím pomoci, nebo se na cokoli zeptejte…" autocomplete="off"></textarea>
+      <button class="stop" type="button" id="stop" title="Zastavit">
+        <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+      </button>
+      <button class="send" type="submit" id="send" title="Odeslat (Enter)" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+      </button>
+    </form>
+    <div class="hint">Enter = odeslat · Shift+Enter = nový řádek · Aiko se před každou změnou zeptá</div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const log = $("log");
+const IDEAS = [
+  ["Zeptat se", "Kdo byl Karel Čapek?"],
+  ["Pustit video", "Otevři YouTube a pusť písničku od Karla Gotta"],
+  ["Zahrát si", "Zahraj si hledání min"],
+  ["Uklidit", "Vytvoř na ploše složku Fotky"],
+  ["Počasí", "Jaké je dnes počasí v Praze?"],
+  ["Kontrola", "Počítač je pomalý, zjisti proč"],
+];
+const scrollDown = () => requestAnimationFrame(() => { log.scrollTop = log.scrollHeight; });
+
+// ---------- zprávy ----------
+let hello = null, typing = null, typingTimer = null, quick = null, busy = 0;
+function showHello() {
+  hello = document.createElement("div");
+  hello.className = "hello";
+  hello.innerHTML = `<div class="orb"></div><h2>Dobrý den, s čím pomůžu?</h2>
+    <p>Odpovím na otázku nebo něco udělám na tomto počítači – vždy se nejdřív zeptám.</p><div class="ideas"></div>`;
+  IDEAS.forEach(([t, s]) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.innerHTML = `<b></b><span></span>`;
+    b.querySelector("b").textContent = t; b.querySelector("span").textContent = s;
+    b.onclick = () => send(s);
+    hello.querySelector(".ideas").append(b);
+  });
+  log.append(hello);
+}
+function hideHello() { if (hello) { hello.remove(); hello = null; } }
+function row(cls) { const r = document.createElement("div"); r.className = "row " + cls; log.append(r); return r; }
+function addMe(text) { hideHello(); const b = document.createElement("div"); b.className = "bubble"; b.textContent = text;
+                       row("me").append(b); scrollDown(); }
+function addAiko(text, guide) {
+  hideHello();
+  const b = document.createElement("div");
+  b.className = "bubble";
+  b.textContent = text;
+  if (guide && guide.length) {
+    const ol = document.createElement("ol");
+    guide.forEach(g => { const li = document.createElement("li"); li.textContent = g; ol.append(li); });
+    b.append(ol);
+  }
+  const r = row("aiko");
+  if (typing) log.insertBefore(r, typing);                 // ukazatel „pracuji“ zůstává dole
+  r.append(b);
+  scrollDown();
+  return b;
+}
+function note(text, err) { const n = document.createElement("div"); n.className = "note" + (err ? " err" : "");
+                           n.textContent = text; log.append(n); scrollDown(); }
+
+function setBusy(on, status) {
+  busy = Math.max(0, busy + (on ? 1 : -1));
+  const active = busy > 0;
+  $("brand").classList.toggle("busy", active);
+  $("stop").classList.toggle("on", active);
+  if (active && !typing) {
+    typing = row("aiko typing");
+    typing.innerHTML = `<div class="bubble"><span class="dots"><i></i><i></i><i></i></span>
+                        <span class="status">Přemýšlím…</span><span class="secs"></span></div>`;
+    const t0 = Date.now();
+    typingTimer = setInterval(() => {
+      const s = Math.round((Date.now() - t0) / 1000);
+      if (typing) typing.querySelector(".secs").textContent = s >= 3 ? s + " s" : "";
+    }, 500);
+    scrollDown();
+  }
+  if (active && status) progress(status);
+  if (!active && typing) { typing.remove(); typing = null; clearInterval(typingTimer); }
+}
+function progress(text) {
+  if (!typing || !text) return;
+  const s = typing.querySelector(".status");
+  s.style.opacity = 0;
+  setTimeout(() => { s.textContent = text; s.style.opacity = 1; }, 120);
+}
+function clearQuick() { if (quick) { quick.remove(); quick = null; } }
+function askYesNo() {
+  clearQuick();
+  quick = document.createElement("div");
+  quick.className = "quick";
+  ["Ano", "Ne"].forEach(t => { const b = document.createElement("button"); b.type = "button"; b.textContent = t;
+                               b.onclick = () => send(t); quick.append(b); });
+  row("aiko").append(quick);
+  quick = quick.parentElement;
+  scrollDown();
+}
+
+// ---------- odpovědi: každá jen jednou (HTTP i WebSocket nesou tutéž) ----------
+const seenReplies = new Set();
+const recentSay = new Map();
+function onReply(r, viaWs) {
+  if (!r || !r.say) return;
+  const key = r.ts + "|" + r.say;
+  if (seenReplies.has(key)) return;
+  seenReplies.add(key);
+  if (r.screen === "pracuje") {                       // průběžný stav – do ukazatele, ne do historie
+    progress(r.say);
+    voice.say(r.say, "progress");
+    return;
+  }
+  clearQuick();
+  const b = addAiko(r.say, r.guide);
+  voice.say(r.say, "final", b);
+  (r.guide || []).forEach((g, i) => voice.say(`Krok ${i + 1}. ${g}`, "final", b));
+  if (r.expects_answer) askYesNo();
+}
+function onSay(text) {
+  if (!text) return;
+  const now = Date.now();
+  if (now - (recentSay.get(text) || 0) < 15000) return;
+  recentSay.set(text, now);
+  if (busy) { progress(text); voice.say(text, "progress"); }
+  else { addAiko(text); voice.say(text, "final"); }
+}
+
+// ---------- hlas Jirka: jedna fronta, nic se nepřekrývá ani neopakuje ----------
+const voice = (() => {
+  let on = localStorage.getItem("aiko.voice") !== "off";
+  let gen = 0;                 // každé „ztiš“ zneplatní vše, co se ještě načítá
+  let queue = [];              // {text, kind, el, url: Promise<string|null>}
+  let current = null;          // {audio, item}
+  const audio = new Audio();
+  audio.preload = "auto";
+
+  function split(text) {       // po větách: první věta zazní dřív, další se mezitím připraví
+    const parts = text.replace(/\s+/g, " ").match(/[^.!?…]+[.!?…]+["“”»]?|[^.!?…]+$/g) || [text];
+    const out = [];
+    for (const p of parts.map(s => s.trim()).filter(Boolean)) {
+      if (out.length && (out[out.length - 1].length < 28 || p.length < 12)) out[out.length - 1] += " " + p;
+      else out.push(p);
+    }
+    return out;
+  }
+  function fetchUrl(text, g) {
+    return fetch("/api/tts?text=" + encodeURIComponent(text.slice(0, 480)))
+      .then(r => r.ok ? r.blob() : null)
+      .then(b => (b && g === gen) ? URL.createObjectURL(b) : null)
+      .catch(() => null);
+  }
+  function say(text, kind, el) {
+    if (!on || !text) return;
+    if (kind === "final") queue = queue.filter(q => q.kind !== "progress");     // stará hláška o průběhu už nepatří
+    else queue = queue.filter(q => q.kind !== "progress");                       // jen poslední průběh
+    if (kind === "progress" && current && current.item.kind === "progress") return;
+    const g = gen;
+    split(text).forEach(t => queue.push({ text: t, kind, el, g, url: fetchUrl(t, g) }));
+    if (!current) next();
+  }
+  async function next() {
+    const item = queue.shift();
+    if (!item) { current = null; return; }
+    current = { item };
+    if (item.el) item.el.classList.add("speaking");
+    const url = await item.url;
+    if (item.g !== gen) return;                         // mezitím ztišeno
+    let finished = false;
+    const done = () => {
+      if (finished) return;                               // onended i onerror zavolají jen jednou
+      finished = true;
+      if (url) URL.revokeObjectURL(url);
+      if (item.el && !queue.some(q => q.el === item.el)) item.el.classList.remove("speaking");
+      if (item.g === gen) next();
+    };
+    if (!url) { fallback(item.text, done); return; }
+    audio.onended = done;
+    audio.onerror = done;
+    audio.src = url;
+    audio.play().catch(done);
+  }
+  function fallback(text, done) {                       // hlas prohlížeče, jen když Jirka není k dispozici
+    if (!("speechSynthesis" in window)) return done();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = "cs-CZ"; u.rate = 0.95;
+    u.onend = done; u.onerror = done;
+    speechSynthesis.speak(u);
+  }
+  function hush() {
+    gen++;
+    queue = [];
+    audio.onended = audio.onerror = null;
+    audio.pause(); audio.removeAttribute("src");
+    if ("speechSynthesis" in window) speechSynthesis.cancel();
+    document.querySelectorAll(".speaking").forEach(e => e.classList.remove("speaking"));
+    current = null;
+  }
+  function toggle() { on = !on; localStorage.setItem("aiko.voice", on ? "on" : "off"); if (!on) hush(); render(); }
+  function render() { $("voiceBtn").classList.toggle("off", !on); $("waves").style.display = on ? "" : "none"; }
+  render();
+  return { say, hush, toggle };
+})();
+
+// ---------- odesílání ----------
+async function post(path, body) {
+  const r = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
+  if (!r.ok) throw new Error("HTTP " + r.status);
+  return r.json();
+}
+async function send(text) {
+  text = (text || "").trim();
+  if (!text) return;
+  voice.hush(); clearQuick();
+  addMe(text);
+  setBusy(true, "Přemýšlím…");
+  try { onReply(await post("/api/utterance", { text, source: "chat" })); }
+  catch (e) { note("Server neodpověděl – běží okno „Start Aiko“?", true); }
+  finally { setBusy(false); }
+}
+const ta = $("text");
+function autosize() { ta.style.height = "auto"; ta.style.height = Math.min(ta.scrollHeight, 160) + "px";
+                      ta.classList.toggle("scroll", ta.scrollHeight > 160);
+                      $("send").disabled = !ta.value.trim(); }
+ta.addEventListener("input", autosize);
+window.addEventListener("resize", autosize);
+autosize();
+ta.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); $("form").requestSubmit(); } });
+$("form").onsubmit = e => { e.preventDefault(); const t = ta.value; ta.value = ""; autosize(); send(t); ta.focus(); };
+$("stop").onclick = async () => { voice.hush(); try { onReply(await post("/api/stop")); } catch (e) {} };
+$("voiceBtn").onclick = () => voice.toggle();
+document.addEventListener("keydown", e => { if (e.key === "Escape") voice.hush(); });
+
+// ---------- stav: model, počítač, „Spustit vše“ ----------
+function setChip(id, state, text) { const c = $(id); c.className = "chip " + state; c.querySelector("span:last-child").textContent = text; }
+function devices(devs) {
+  const pc = (devs || []).find(d => d.kind === "pc" && d.online);
+  setChip("pcChip", pc ? "ok" : "", pc ? "počítač připojen" : "počítač nepřipojen");
+}
+async function refreshState() {
+  try {
+    const st = await (await fetch("/api/state")).json();
+    devices(st.devices);
+    const llm = st.llm || "", local = /ollama/i.test(llm);
+    setChip("modelChip", local ? "ok" : "wait", local ? (st.vlm || llm).replace(/^ollama:/, "") : "model neběží");
+    return st;
+  } catch (e) { return null; }
+}
+$("startAll").onclick = async () => {
+  const b = $("startAll"), label = b.querySelector("span");
+  b.disabled = true; label.innerHTML = '<span class="spin"></span>';
+  try {
+    const r = await post("/api/local/start");
+    note(r.say);
+    for (let i = 0; i < 20 && r.started.length; i++) {            // počkat, až se rozjede
+      await new Promise(res => setTimeout(res, 1500));
+      const st = await refreshState();
+      if (st && (st.devices || []).some(d => d.kind === "pc" && d.online) && /ollama/i.test(st.llm || "")) break;
+    }
+  } catch (e) { note("Server neběží – spusťte „Start Aiko.bat“ ve složce Aiko-Local.", true); }
+  b.disabled = false; label.textContent = "Spustit vše";
+};
+
+let booted = false;
+function connect() {
+  const ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws/ui");
+  ws.onopen = () => { $("bootText").textContent = "Připojeno"; };
+  ws.onmessage = ev => {
+    const m = JSON.parse(ev.data);
+    if (m.type === "snapshot") {
+      devices(m.devices); refreshState();
+      if (!booted) { booted = true; $("boot").classList.add("gone"); showHello(); ta.focus(); }
+    } else if (m.type === "devices") devices(m.devices);
+    else if (m.type === "say") onSay(m.text);
+    else if (m.type === "reply") onReply(m.reply, true);
+    else if (m.type === "agent" && busy) progress(`Krok ${m.step}: ${m.action}`);
+  };
+  ws.onclose = () => {
+    if (!booted) $("bootText").textContent = "Čekám na server Aiko…";
+    else setChip("pcChip", "wait", "spojení přerušeno");
+    setTimeout(connect, 1500);
+  };
+}
+connect();
+setInterval(refreshState, 15000);
+</script>
+</body>
+</html>

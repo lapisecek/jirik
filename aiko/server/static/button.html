@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aiko tlačítko</title>
+<link rel="stylesheet" href="/static/aiko.css">
+<style>
+  main { display: grid; grid-template-columns: minmax(320px, 440px) 1fr; gap: 20px; padding: 20px; max-width: 1100px; margin: 0 auto; }
+  @media (max-width: 820px) { main { grid-template-columns: 1fr; padding: 16px; } }
+
+  /* Obrazovka seniora: písmo min. 24 pt, vysoký kontrast, nejvýš dvě tlačítka */
+  .phone {
+    background: var(--panel); border: 10px solid #111; border-radius: 38px; min-height: 640px;
+    display: flex; flex-direction: column; overflow: hidden; position: relative;
+  }
+  .working {
+    display: none; background: var(--accent); color: var(--accent-ink); padding: 18px 20px;
+    font-size: 24px; font-weight: 600; align-items: center; gap: 12px;
+  }
+  .working.show { display: flex; }
+  .working button { margin-left: auto; font-size: 20px; padding: 10px 16px; border-radius: 12px; border: 0;
+    background: var(--accent-ink); color: var(--accent); font-weight: 700; }
+  .screen { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center;
+    text-align: center; padding: 28px 22px; gap: 26px; }
+  .say { font-size: 30px; line-height: 1.3; font-weight: 600; }
+  .hint { font-size: 24px; color: var(--muted); }
+  .guide { text-align: left; font-size: 24px; line-height: 1.4; margin: 6px 0 14px; padding-left: 1.6em; max-width: 34em; }
+  .guide li { margin: 0 0 10px; padding-left: 4px; }
+  .guide-title { font-size: 22px; font-weight: 700; margin-top: 10px; }
+  .screen.hotovo { background: var(--green-bg); }
+  .screen.hotovo .say { color: var(--green); }
+  .screen.odmitnuto { background: var(--red-bg); }
+  .screen.odmitnuto .say { color: var(--red); }
+  .screen.chyba .say { color: var(--red); }
+  .big { font-size: 34px; font-weight: 800; border: 0; border-radius: 22px; padding: 26px 0; width: 100%; }
+  .yesno { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; width: 100%; }
+  .yes { background: var(--green); color: #fff; }
+  .no { background: var(--panel); color: var(--ink); border: 3px solid var(--ink); }
+  .call { background: var(--red); color: #fff; }
+
+  .talk {
+    width: 210px; height: 210px; border-radius: 50%; border: 0; font-size: 26px; font-weight: 800;
+    background: var(--accent); color: var(--accent-ink); box-shadow: 0 10px 30px rgba(47,111,222,.35);
+    touch-action: none; user-select: none; -webkit-user-select: none;
+  }
+  .talk.rec { background: var(--red); animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+  .wave { display: flex; gap: 6px; height: 60px; align-items: center; }
+  .wave i { width: 10px; background: var(--accent); border-radius: 6px; animation: w 1s infinite ease-in-out; }
+  .wave i:nth-child(2) { animation-delay: .1s } .wave i:nth-child(3) { animation-delay: .2s }
+  .wave i:nth-child(4) { animation-delay: .3s } .wave i:nth-child(5) { animation-delay: .4s }
+  @keyframes w { 0%,100% { height: 14px } 50% { height: 58px } }
+  .led { width: 16px; height: 16px; border-radius: 50%; background: #444; display: inline-block; vertical-align: middle; }
+  .led.blue { background: #2f6fde; box-shadow: 0 0 12px #2f6fde; }
+  .led.green { background: #1f8a4c; box-shadow: 0 0 12px #1f8a4c; }
+  .led.red { background: #c42b2b; box-shadow: 0 0 12px #c42b2b; }
+  .led.blink { background: #2f6fde; animation: blink .5s infinite; }
+  @keyframes blink { 50% { opacity: .2 } }
+
+  .side { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  form.text { display: flex; gap: 8px; }
+  form.text input { flex: 1; min-width: 0; font: inherit; padding: 10px 12px; border-radius: 10px;
+    border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chips button { font-size: 14px; }
+  .log { font-family: ui-monospace, Consolas, monospace; font-size: 13px; max-height: 260px; overflow: auto;
+    display: flex; flex-direction: column-reverse; gap: 4px; }
+  .log div { border-bottom: 1px dashed var(--line); padding: 3px 0; overflow-wrap: anywhere; }
+  label.opt { display: flex; gap: 8px; align-items: center; font-size: 14px; }
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>Aiko · tlačítko</h1>
+  <span class="sub">obrazovka seniora a simulátor tlačítka</span>
+  <span class="pill"><span class="led off" id="led"></span> LED tlačítka</span>
+  <span class="pill" id="devs">zařízení: –</span>
+  <nav><a href="/">Rodinná stránka</a></nav>
+</header>
+<main>
+  <section class="phone" aria-live="polite">
+    <div class="working" id="working"><span id="workingText">Aiko pracuje</span><button id="stopBtn">ZASTAVIT</button></div>
+    <div class="screen" id="screen"></div>
+  </section>
+
+  <section class="side">
+    <div class="card">
+      <h2>Napsat větu místo mluvení</h2>
+      <form class="text" id="textForm">
+        <input id="textIn" placeholder="např. Zmizel mi WhatsApp" autocomplete="off">
+        <button class="btn primary">Říct</button>
+      </form>
+      <div class="chips" style="margin-top:12px" id="chips"></div>
+    </div>
+    <div class="card">
+      <h2>Nastavení simulátoru</h2>
+      <label class="opt"><input type="checkbox" id="speak" checked> Aiko mluví nahlas</label>
+      <p class="muted" id="voiceInfo" style="margin:8px 0 0;font-size:14px"></p>
+    </div>
+    <div class="card">
+      <h2>Průběh</h2>
+      <div class="log" id="log"></div>
+    </div>
+  </section>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const DEMO = [
+  "Zmizel mi WhatsApp", "Nic neslyším, nezvoní mi to", "Na počítači mi nejde otevřít Seznam",
+  "Napiš Lence, že přijdu později", "Je to moc malé, nevidím", "Rychle se mi to vybíjí",
+  "Volal mi někdo z banky, ať si nainstaluju AnyDesk", "Objednej mi taxi domů",
+];
+let info = { voice: { stt: false, tts: false }, senior: "Paní Jano", family: "Petr", family_dative: "Petrovi" };
+let reply = { screen: "klid", say: "Aiko je připravená." };
+let recording = null;
+
+function esc(s) { return String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+function logLine(t) { const d = document.createElement("div"); d.textContent = new Date().toLocaleTimeString("cs") + "  " + t; $("log").prepend(d); }
+
+// --- obrazovka seniora ------------------------------------------------------------
+function render() {
+  const s = reply.screen || "klid";
+  const el = $("screen");
+  el.className = "screen " + s;
+  $("working").classList.toggle("show", s === "pracuje");
+  if (s === "pracuje") $("workingText").textContent = "Aiko pracuje: " + reply.say;
+  $("led").className = "led " + (reply.led || "off");
+  let html = "";
+  if (s === "posloucham") {
+    html = `<div class="wave"><i></i><i></i><i></i><i></i><i></i></div><div class="say">${esc(reply.say)}</div>
+            <div class="hint" id="live">Mluvte, dokud držíte tlačítko.</div>`;
+  } else if (s === "potvrzeni") {
+    html = `<div class="say">${esc(reply.say)}</div>
+            <div class="yesno"><button class="big yes" data-say="ano">ANO</button><button class="big no" data-say="ne">NE</button></div>`;
+  } else if (s === "odmitnuto") {
+    html = `<div class="say">Tohle je nejspíš podvod.</div><div class="hint">${esc(reply.say)}</div>
+            <button class="big call" data-say="Zavolej ${esc(info.family_dative)}">Zavolat ${esc(info.family_dative)}</button>`;
+  } else if (s === "pracuje") {
+    html = `<div class="say">Chvilku strpení…</div>`;
+  } else {
+    const head = s === "klid" ? "Aiko je připravená." : reply.say;
+    html = `<div class="say">${esc(head)}</div>`;
+  }
+  if (reply.guide && reply.guide.length && s !== "pracuje") {
+    // postup pro seniora, když to Aiko nedokončila – velké písmo, jeden krok na řádek
+    const steps = reply.guide.map(t => `<li>${esc(t)}</li>`).join("");
+    html = html.replace(/<div class="say">[\s\S]*?<\/div>/,
+      head => `${head}<div class="guide-title">Jak to dokončit:</div><ol class="guide">${steps}</ol>`);
+  }
+  if (s !== "potvrzeni" && s !== "pracuje" && s !== "odmitnuto") {
+    html += `<button class="talk ${recording ? "rec" : ""}" id="talk">Držte<br>a mluvte</button>`;
+  }
+  el.innerHTML = html;
+  const talk = $("talk");
+  if (talk) bindTalk(talk);
+  el.querySelectorAll("[data-say]").forEach(b => b.onclick = () => sendText(b.dataset.say));
+}
+
+// --- řeč ---------------------------------------------------------------------------
+const speakQueue = [];
+let speaking = false;
+function speak(text) {
+  if (recording || !$("speak").checked || !text) return;
+  speakQueue.push(text);
+  if (!speaking) nextSpeak();
+}
+async function nextSpeak() {
+  if (recording) { speakQueue.length = 0; speaking = false; return; }
+  const text = speakQueue.shift();
+  if (!text) { speaking = false; return; }
+  speaking = true;
+  if (info.voice.tts) {
+    const a = new Audio("/api/tts?text=" + encodeURIComponent(text));
+    a.onended = a.onerror = nextSpeak;
+    a.play().catch(nextSpeak);
+    return;
+  }
+  if (!("speechSynthesis" in window)) { speaking = false; return; }
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = "cs-CZ"; u.rate = 0.85;
+  const voices = speechSynthesis.getVoices().filter(v => v.lang.startsWith("cs"));
+  u.voice = voices.find(v => /vlasta|zuzana|female|žena/i.test(v.name)) || voices[0] || null;
+  u.onend = u.onerror = nextSpeak;
+  speechSynthesis.speak(u);
+}
+function stopSpeaking() { speakQueue.length = 0; if ("speechSynthesis" in window) speechSynthesis.cancel(); speaking = false; }
+
+// --- push-to-talk (s čistým 16kHz WAV, 250ms pre-rollem a 220ms dozněním) -------------
+let warmMic = null; // { stream, ctx, preRoll: Float32Array[], preRollSamples: number, activeRec: float32[]|null }
+const TARGET_RATE = 16000;
+const PRE_ROLL_SAMPLES = Math.round(TARGET_RATE * 0.25); // 250 ms před stiskem
+const TAIL_MS = 220;                                     // 220 ms po uvolnění tlačítka
+
+function encodeWav16kMono(chunks) {
+  let total = 0;
+  for (const c of chunks) total += c.length;
+  const buf = new ArrayBuffer(44 + total * 2);
+  const view = new DataView(buf);
+  const writeStr = (off, s) => { for (let i = 0; i < s.length; i++) view.setUint8(off + i, s.charCodeAt(i)); };
+  writeStr(0, "RIFF");
+  view.setUint32(4, 36 + total * 2, true);
+  writeStr(8, "WAVE");
+  writeStr(12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, TARGET_RATE, true);
+  view.setUint32(28, TARGET_RATE * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  writeStr(36, "data");
+  view.setUint32(40, total * 2, true);
+  let offset = 44;
+  for (const c of chunks) {
+    for (let i = 0; i < c.length; i++, offset += 2) {
+      const s = Math.max(-1, Math.min(1, c[i]));
+      view.setInt16(offset, s < 0 ? s * 32768 : s * 32767, true);
+    }
+  }
+  return new Blob([buf], { type: "audio/wav" });
+}
+
+function resampleTo16k(input, srcRate) {
+  if (srcRate === TARGET_RATE) return new Float32Array(input);
+  const ratio = srcRate / TARGET_RATE;
+  const outLen = Math.max(1, Math.round(input.length / ratio));
+  const out = new Float32Array(outLen);
+  for (let i = 0; i < outLen; i++) {
+    const pos = i * ratio;
+    const idx = Math.floor(pos);
+    const frac = pos - idx;
+    const a = input[idx] || 0;
+    const b = input[Math.min(input.length - 1, idx + 1)] || a;
+    out[i] = a + (b - a) * frac;
+  }
+  return out;
+}
+
+async function ensureWarmMic() {
+  if (warmMic && warmMic.stream && warmMic.stream.active) return warmMic;
+  const stream = await navigator.mediaDevices.getUserMedia({
+    audio: {
+      echoCancellation: true,
+      noiseSuppression: false, // zachová přirozenou artikulaci, souhlásky a zvuky úst
+      autoGainControl: true,
+      channelCount: 1,
+      sampleRate: TARGET_RATE,
+    },
+  });
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  const ctx = new AudioCtx();
+  const src = ctx.createMediaStreamSource(stream);
+  const proc = ctx.createScriptProcessor(1024, 1, 1);
+  const state = { stream, ctx, src, proc, preRoll: [], preRollSamples: 0, activeChunks: null };
+  proc.onaudioprocess = ev => {
+    const chunk16k = resampleTo16k(ev.inputBuffer.getChannelData(0), ctx.sampleRate);
+    if (state.activeChunks) {
+      state.activeChunks.push(chunk16k);
+    } else {
+      state.preRoll.push(chunk16k);
+      state.preRollSamples += chunk16k.length;
+      while (state.preRollSamples > PRE_ROLL_SAMPLES && state.preRoll.length > 1) {
+        state.preRollSamples -= state.preRoll.shift().length;
+      }
+    }
+  };
+  src.connect(proc);
+  proc.connect(ctx.destination);
+  warmMic = state;
+  return state;
+}
+
+function bindTalk(btn) {
+  btn.onpointerdown = e => {
+    e.preventDefault();
+    try { btn.setPointerCapture(e.pointerId); } catch (_) {}
+    startTalk();
+  };
+  btn.onpointerup = e => {
+    e.preventDefault();
+    try { btn.releasePointerCapture(e.pointerId); } catch (_) {}
+    endTalk();
+  };
+  btn.onpointercancel = () => recording && endTalk();
+  btn.onkeydown = e => { if (e.key === " " && !recording) { e.preventDefault(); startTalk(); } };
+  btn.onkeyup = e => { if (e.key === " ") { e.preventDefault(); endTalk(); } };
+}
+
+async function startTalk() {
+  if (recording) return;
+  stopSpeaking();
+  recording = { chunks: [], text: "", stopping: false };
+  reply = { ...reply, screen: "posloucham", led: "blue", say: `Poslouchám, ${info.senior || "Paní Jano"}.` };
+  render();
+  post("/api/press", {}); // nevoláme speak() během nahrávání a nepřepisujeme tlačítko pod prstem
+  try {
+    if (info.voice.stt) {
+      const mic = await ensureWarmMic();
+      if (mic.ctx.state === "suspended") await mic.ctx.resume();
+      recording.pcmChunks = [...mic.preRoll];
+      mic.preRoll = [];
+      mic.preRollSamples = 0;
+      mic.activeChunks = recording.pcmChunks;
+      recording.mic = mic;
+    } else {
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SR) { logLine("Prohlížeč neumí rozpoznávat řeč – napište větu do pole vpravo."); return; }
+      const rec = new SR();
+      rec.lang = "cs-CZ"; rec.interimResults = true; rec.continuous = true;
+      rec.onresult = ev => {
+        if (!recording) return;
+        recording.text = Array.from(ev.results).map(r => r[0].transcript).join(" ");
+        const live = $("live"); if (live) live.textContent = recording.text;
+      };
+      rec.start();
+      recording.rec = rec;
+    }
+  } catch (e) { logLine("Mikrofon: " + e.message); }
+}
+
+async function endTalk() {
+  const r = recording;
+  if (!r || r.stopping) return;
+  r.stopping = true;
+  if (r.mic) {
+    // 220 ms doznění po uvolnění tlačítka, aby se nikdy neusekla poslední slabika
+    await new Promise(res => setTimeout(res, TAIL_MS));
+    r.mic.activeChunks = null;
+    recording = null;
+    render();
+    const wavBlob = encodeWav16kMono(r.pcmChunks || []);
+    const res = await fetch("/api/audio?rate=16000", {
+      method: "POST",
+      headers: { "Content-Type": "audio/wav" },
+      body: wavBlob,
+    });
+    handleReply(await res.json());
+  } else if (r.rec) {
+    await new Promise(res => setTimeout(res, TAIL_MS));
+    recording = null;
+    r.rec.onend = () => { if (r.text.trim()) sendText(r.text.trim()); else render(); };
+    r.rec.stop();
+  } else {
+    recording = null;
+    render();
+  }
+}
+
+// --- server ---------------------------------------------------------------------------
+async function post(url, body) {
+  const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  return res.json();
+}
+async function sendText(text) {
+  logLine("Senior: " + text);
+  handleReply(await post("/api/utterance", { text, source: "web" }));
+}
+function handleReply(r) {
+  if (!r || !r.say) return;
+  reply = r;
+  render();
+}
+
+function connect() {
+  const ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws/ui");
+  ws.onmessage = ev => {
+    const m = JSON.parse(ev.data);
+    if (m.type === "snapshot") {
+      info = m; reply = m.reply; render(); renderDevices(m.devices);
+      $("voiceInfo").textContent =
+        `Porozumění: ${m.llm}. GUI agent: ${m.vlm || "vypnutý (chybí Vision model)"}. ` +
+        `Řeč → text: ${m.voice.stt ? "Faster-Whisper na serveru" : "prohlížeč (Web Speech)"}. ` +
+        `Text → řeč: ${m.voice.tts ? "Piper na serveru" : "prohlížeč"}.`;
+    } else if (m.type === "reply") {
+      reply = m.reply;
+      if (!recording) {
+        // během nahrávání nemluvit (prohlížeč by nahrál vlastní hlas); kroky návodu přečíst po odpovědi
+        render(); speak(m.reply.say);
+        (m.reply.guide || []).forEach((t, i) => speak(`Krok ${i + 1}. ${t}`));
+      }
+      logLine("Aiko: " + m.reply.say);
+    } else if (m.type === "say") {
+      speak(m.text); logLine("Aiko: " + m.text);
+    } else if (m.type === "transcript") {
+      logLine("Přepis: " + (m.text || "(nic)"));
+    } else if (m.type === "agent") {
+      logLine(`Agent krok ${m.step}: ${m.action}${m.thought ? " – " + m.thought : ""}`);
+    } else if (m.type === "devices") renderDevices(m.devices);
+  };
+  ws.onclose = () => setTimeout(connect, 1500);
+}
+function renderDevices(devs) {
+  const on = devs.filter(d => d.online).length;
+  $("devs").innerHTML = `<span class="dot ${on ? "on" : "off"}"></span> zařízení online: ${on}/${devs.length}`;
+}
+
+$("textForm").onsubmit = e => { e.preventDefault(); const t = $("textIn").value.trim(); if (t) { sendText(t); $("textIn").value = ""; } };
+$("stopBtn").onclick = () => post("/api/stop", {}).then(handleReply);
+DEMO.forEach(t => { const b = document.createElement("button"); b.className = "btn"; b.textContent = t; b.onclick = () => sendText(t); $("chips").append(b); });
+if ("speechSynthesis" in window) speechSynthesis.onvoiceschanged = () => {};
+render();
+connect();
+</script>
+</body>
+</html>

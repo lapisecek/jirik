@@ -1,0 +1,28 @@
+# Aiko – místní chat: běží jen na tomto počítači (127.0.0.1), ovládá jen tento počítač.
+
+[aiko]
+senior_name = "Adame"
+senior_female = false
+host = "127.0.0.1"             # jen tento počítač – z jiných zařízení v síti se sem nikdo nepřipojí
+port = 8770
+token = ""                     # na 127.0.0.1 není potřeba
+data_dir = "data"
+mdns = false
+adb_watchdog = false           # žádný telefon
+
+[llm]
+provider = "auto"              # auto = místní Ollama, když běží; jinak klíčová slova
+ollama_url = "http://localhost:11434"
+ollama_model = "hf.co/unsloth/gemma-3-4b-it-GGUF:Q4_K_M"   # Gemma 3 4B – celá v 6 GB grafice = rychlá; chytřejší, ale pomalá: "gemma4:latest"
+local_first = true
+keywords_first = true          # jasné věty bez modelu (rychlejší); nejasné rozhodne model
+
+[vlm]                          # model, který se dívá na obrazovku a kliká
+provider = "ollama"
+ollama_model = "hf.co/unsloth/gemma-3-4b-it-GGUF:Q4_K_M"   # stejný model jako [llm] – v grafice je jen jeden
+local_first = true
+
+[voice]
+piper_model = "voices/cs_CZ-jirka-medium.onnx"   # hlas Jirka (Piper), běží místně
+speech_rate = 0.9
+whisper_warmup = false

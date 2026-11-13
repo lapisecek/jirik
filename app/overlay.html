@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline'">
+<title></title>
+<style>
+  /* Zářící rámeček kolem obrazovky, když Aiko ovládá počítač. Kliky jdou skrz, snímky obrazovky ho nevidí. */
+  @property --a { syntax: "<angle>"; inherits: true; initial-value: 0deg; }
+  html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
+  .frame { position: fixed; inset: 0; opacity: 0; transition: opacity .7s ease; --a: 0deg;
+           animation: spin 5s linear infinite; }
+  .on .frame { opacity: 1; }
+  .ring, .glow { position: absolute; inset: 0; border-radius: 12px;
+    background: conic-gradient(from var(--a), #6d84ff, #a86dff, #ff6dbd, #ffad6d, #6dd6ff, #6d84ff);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor; mask-composite: exclude; }
+  .ring { padding: 4px; }
+  .glow { padding: 26px; filter: blur(22px); opacity: .55; animation: breathe 2.6s ease-in-out infinite; }
+  .tint { position: absolute; inset: 0; box-shadow: inset 0 0 140px rgba(120, 110, 255, .16); }
+  @keyframes spin { to { --a: 360deg; } }
+  @keyframes breathe { 50% { opacity: .9; } }
+  @media (prefers-reduced-motion: reduce) { .frame, .glow { animation: none; } }
+</style>
+</head>
+<body>
+<div class="frame"><div class="tint"></div><div class="glow"></div><div class="ring"></div></div>
+<script>
+function setOn(on) { document.body.classList.toggle("on", on); }
+</script>
+</body>
+</html>
