@@ -94,22 +94,11 @@ def parse(text: str, path: str = "") -> Skill:
     if not meta.get("description"):
         raise ValueError("chybí description")
     agent = next((v for k, v in sections.items() if k.startswith(("postup pro aiko", "for aiko", "agent"))), "")
-    senior_raw = next((v for k, v in sections.items() if k.startswith(("pro seniora", "senior"))), "")
     if not agent.strip():
         raise ValueError("chybí sekce „## Postup pro Aiko“")
-    senior = [re.sub(r"^\s*\d+[.)]\s*", "", ln).strip() for ln in senior_raw.splitlines()
-              if re.match(r"^\s*\d+[.)]\s+\S", ln)]
-    if senior:
-        from .guide import clean
-
-        checked = clean({"steps": senior})
-        if checked is None:
-            log.warning("Skill %s: postup pro seniora neprošel kontrolou (zakázaná slova / délka) – nepoužije se",
-                        name)
-        senior = checked or []
     return Skill(name=name, title=meta.get("title", name), description=meta["description"],
                  keywords=[_plain(k) for k in lst("keywords")], devices=[d.lower() for d in lst("devices")] or
-                 ["pc", "phone"], tools=lst("tools"), agent=agent.strip()[:MAX_AGENT_CHARS], senior=senior[:8],
+                 ["pc", "phone"], tools=lst("tools"), agent=agent.strip()[:MAX_AGENT_CHARS],
                  answer_tool=meta.get("answer_tool", ""), first_tool=meta.get("first_tool", ""),
                  exclude=[_plain(k) for k in lst("exclude")], path=path)
 

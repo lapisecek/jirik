@@ -1,7 +1,7 @@
 [project]
-name = "aiko-lan"
-version = "0.1.0"
-description = "Aiko LAN – lokální AI orchestrátor pro opravu telefonů a počítačů seniorů"
+name = "aiko"
+version = "2.0.0"
+description = "Aiko – místní AI chat, který ovládá tento počítač i spárované počítače v síti"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.110",
@@ -9,18 +9,18 @@ dependencies = [
     "websockets>=12",
     "httpx>=0.27",
     "pydantic>=2.6",
-    "zeroconf>=0.131",
-    "pillow>=10.1",            # Set-of-Marks (štítky do snímku obrazovky)
+    "pillow>=10.1",
+    "cryptography>=42",        # certifikát pro šifrovanou bránu Aiko Link
+    "piper-tts>=1.2",          # hlas Jirka
+    "numpy>=1.26",
 ]
 
 [project.optional-dependencies]
-# Hlas na serveru (Faster-Whisper STT). Piper TTS se volá jako binárka, viz README.
-voice = ["faster-whisper>=1.0"]
-# Porozumění a GUI agent přes Claude API (jinak Ollama / Gemini / klíčová slova).
+# Volitelně cloudové modely pro klikání po obrazovce (jinak místní Ollama).
 claude = ["anthropic>=0.60"]
 # GUI agent na počítači: snímek obrazovky, prvky oken, myš a klávesnice.
 # winrt-* = vestavěné OCR Windows 10/11 (nápisy ze snímku v jakékoli aplikaci) – nic se neinstaluje do Windows.
-pc = ["mss>=9", "pyautogui>=0.9.54", "pywinauto>=0.6.8; sys_platform == 'win32'",
+pc = ["mss>=9", "psutil>=5.9", "pyautogui>=0.9.54", "pywinauto>=0.6.8; sys_platform == 'win32'",
       "winrt-runtime>=3; sys_platform == 'win32'",
       "winrt-Windows.Foundation>=3; sys_platform == 'win32'",
       "winrt-Windows.Foundation.Collections>=3; sys_platform == 'win32'",
@@ -35,9 +35,9 @@ include = ["aiko*"]
 
 [tool.setuptools.package-data]
 "aiko.server" = ["static/*"]
-"aiko" = ["skills/*/SKILL.md"]
+"aiko" = ["skills/*/SKILL.md", "link/install/*"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
-testpaths = ["tests", "raspberry_pi"]   # server + firmware tlačítka na Pi
+testpaths = ["tests"]

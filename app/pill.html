@@ -5,45 +5,60 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline'">
 <title></title>
 <style>
+  :root { --ink: #1B1A17; --paper: #F4F2EE; --mute: #A39E94; --accent: #E0492A; --ok: #4CB27A;
+          --out: cubic-bezier(.16, 1, .3, 1); --spring: cubic-bezier(.22, 1.18, .36, 1); }
   html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; user-select: none;
-               font: 14px/1.3 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; }
-  .pill { position: absolute; inset: 6px; display: flex; align-items: center; gap: 12px; padding: 0 8px 0 10px;
-          border-radius: 999px; color: #f3f4f8; background: rgba(22, 24, 32, .86);
-          border: 1px solid rgba(255,255,255,.12); box-shadow: 0 8px 28px rgba(0,0,0,.35);
-          backdrop-filter: blur(18px); opacity: 0; transform: translateY(-10px) scale(.97);
-          transition: opacity .35s ease, transform .35s cubic-bezier(.2,.8,.2,1); cursor: pointer; }
+               font: 13.5px/1.3 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; }
+  .pill { position: absolute; left: 6px; right: 6px; top: 6px; height: 48px; display: flex; align-items: center; gap: 12px;
+          padding: 0 6px 0 14px; border-radius: 14px; color: var(--paper); background: var(--ink); cursor: pointer;
+          box-shadow: 0 10px 24px -12px rgba(0,0,0,.55); opacity: 0; transform: translateY(-14px) scale(.96);
+          transition: opacity .3s var(--out), transform .55s var(--spring); }
   .shown .pill { opacity: 1; transform: none; }
-  .orb { width: 26px; height: 26px; border-radius: 50%; flex: none; position: relative;
-         background: conic-gradient(from 0deg, #6d84ff, #a86dff, #ff6dbd, #ffad6d, #6dd6ff, #6d84ff);
-         animation: rot 1.6s linear infinite; }
-  .orb::after { content: ""; position: absolute; inset: 7px; border-radius: 50%; background: #161820; }
-  .done .orb { animation: none; background: #1f9d55; }
-  .done .orb::after { inset: 0; background: none;
-    content: "✓"; color: #fff; font-weight: 700; display: grid; place-items: center; }
-  @keyframes rot { to { transform: rotate(360deg); } }
+  .mark { width: 24px; height: 24px; flex: none; }
+  .mark svg { width: 100%; height: 100%; overflow: visible; display: block; }
+  .mark .hd { transform-origin: 16px 27px; }
+  .mark .face, .mark .ear { fill: var(--accent); transition: fill .5s; }
+  .mark .cap { fill: #4A453E; }
+  .mark .stache, .mark .brows { fill: #F4F2EE; transform-origin: 16px 24px; }
+  .mark .seam { fill: none; stroke: rgba(244,242,238,.16); stroke-width: .8; stroke-linecap: round; }
+  .mark .specs circle { fill: none; stroke: #F4F2EE; stroke-width: 1.45; }
+  .mark .specs path { fill: none; stroke: #F4F2EE; stroke-width: 1.3; stroke-linecap: round; }
+  .mark .eyes { fill: #1B1A17; transform-box: fill-box; transform-origin: center; animation: blink 5.5s 1.2s infinite; }
+  @keyframes blink { 0%, 93%, 100% { transform: scaleY(1); } 96% { transform: scaleY(.1); } }
+  @keyframes nod { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-7deg) translateY(.4px); }
+                   50% { transform: rotate(0) translateY(.9px); } 75% { transform: rotate(7deg) translateY(.4px); } }
+  @keyframes twitch { 0%, 100% { transform: scaleX(1); } 50% { transform: scaleX(1.12) scaleY(.92); } }
+  .mark .hd { animation: nod 1.5s cubic-bezier(.45,0,.55,1) infinite; }
+  .mark .stache { animation: twitch 1.5s cubic-bezier(.45,0,.55,1) infinite; }
+  .done .mark .hd, .done .mark .stache { animation: none; }
+  .done .mark .face, .done .mark .ear { fill: var(--ok); }
   .txt { flex: 1; min-width: 0; }
-  .title { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; opacity: .6; }
-  .msg { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  button { font: inherit; color: #fff; background: #dc2626; border: 0; border-radius: 999px; padding: 7px 14px;
-           cursor: pointer; transition: transform .1s, opacity .2s; }
-  button:active { transform: scale(.95); }
-  .done button { display: none; }
+  .title { font: 600 10px/1.2 "Cascadia Mono", Consolas, monospace; letter-spacing: .1em; text-transform: uppercase; color: var(--mute); }
+  .msg { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: opacity .2s; }
+  button { font: 600 12.5px/1 inherit; font-family: inherit; color: var(--paper); background: transparent; height: 34px;
+           padding: 0 14px; border: 1px solid rgba(244,242,238,.22); border-radius: 10px; cursor: pointer;
+           transition: background-color .15s, transform .25s var(--spring), opacity .3s; }
+  button:hover { background: var(--accent); border-color: var(--accent); }
+  button:active { transform: scale(.93); }
+  .done button { opacity: 0; pointer-events: none; }
 </style>
 </head>
 <body>
-<div class="pill" id="pill" title="Otevřít chat Aiko">
-  <div class="orb"></div>
-  <div class="txt"><div class="title" id="title">Aiko pracuje na počítači</div><div class="msg" id="msg">…</div></div>
-  <button id="stop" title="Zastavit Aiko">Stop</button>
+<div class="pill" id="pill" title="Otevřít Jiříka">
+  <div class="mark"><svg viewBox="0 0 32 32" aria-hidden="true"><g class="hd"><circle class="ear" cx="4.3" cy="19.6" r="2.3"/><circle class="ear" cx="27.7" cy="19.6" r="2.3"/><circle class="face" cx="16" cy="18" r="12.2"/><path class="cap" d="M4.1 14.3C4.4 8.7 9.1 5.3 16.2 5.3c6.9 0 11.6 3.1 11.8 8.6 1.5.4 2.1 1.4 1.4 2.3-8.1-1.6-18.6-1.6-26.7.2-.7-.9-.2-1.8 1.4-2.1Z"/><path class="seam" d="M5.6 13.4c5.6-1.9 15.2-1.9 20.8-.2"/><path class="brows" d="M8.2 17.3c1.2-1.6 3.7-2 6-1 .3.2.2.6-.1.6-1.9-.3-3.8 0-5.5.8-.3.1-.5-.2-.4-.4ZM23.8 17.3c-1.2-1.6-3.7-2-6-1-.3.2-.2.6.1.6 1.9-.3 3.8 0 5.5.8.3.1.5-.2.4-.4Z"/><g class="eyes"><circle cx="11.7" cy="19.7" r="1"/><circle cx="20.3" cy="19.7" r="1"/></g><g class="specs"><circle cx="11.7" cy="19.7" r="3.1"/><circle cx="20.3" cy="19.7" r="3.1"/><path d="M14.8 19.5q1.2-.9 2.4 0"/></g><path class="stache" d="M16 23.3c-1.4-1.2-3.6-1.3-5.2-.2-1 .7-2 1-3 .8 1.1 2.2 3.8 2.8 5.8 1.8 1-.5 1.8-1 2.4-1.5.6.5 1.4 1 2.4 1.5 2 1 4.7.4 5.8-1.8-1 .2-2-.1-3-.8-1.6-1.1-3.8-1-5.2.2Z"/></g></svg></div>
+  <div class="txt"><div class="title" id="title">Jiřík pracuje</div><div class="msg" id="msg">…</div></div>
+  <button id="stop" title="Zastavit">Stop</button>
 </div>
 <script>
 const $ = id => document.getElementById(id);
 function setPill(state, text) {
   document.body.classList.add("shown");
   document.body.classList.toggle("done", state === "done");
-  $("title").textContent = state === "done" ? "Aiko je hotová" : "Aiko pracuje na počítači";
-  $("msg").textContent = text || "";
+  $("title").textContent = state === "done" ? "Hotovo" : "Jiřík pracuje";
+  const m = $("msg"); m.style.opacity = 0;
+  setTimeout(() => { m.textContent = text || ""; m.style.opacity = 1; }, 120);
 }
+function hidePill() { document.body.classList.remove("shown"); }
 $("pill").onclick = e => { if (e.target.id !== "stop") window.aiko.open(); };
 $("stop").onclick = () => { window.aiko.stop(); $("msg").textContent = "Zastavuji…"; };
 </script>

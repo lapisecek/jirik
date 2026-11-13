@@ -15,3 +15,6 @@ voices/*.onnx.json
 # sestavení
 dist/
 out/
+
+# osobní nastavení (jméno, oslovení)
+aiko.user.toml

@@ -586,6 +586,109 @@ def click(x: int, y: int, double: bool = False, right: bool = False, hover_s: fl
         pyautogui.click()
 
 
+def move(x: int, y: int, duration: float = 0.25) -> None:
+    import pyautogui
+
+    dpi_aware()
+    pyautogui.moveTo(x, y, duration=duration, tween=pyautogui.easeInOutQuad)
+
+
+def activate_at(x: int, y: int) -> bool:
+    """Okno pod bodem dá do popředí. Neaktivní okno jinak „spolkne“ první klik/tah jen na svou aktivaci
+    (živě: v Malování se první čára nenakreslila). Vrací True, když se okno muselo přepnout."""
+    if not WIN:
+        return False
+    from ctypes import wintypes
+
+    user32 = ctypes.windll.user32
+    user32.WindowFromPoint.restype = wintypes.HWND
+    user32.GetAncestor.restype = wintypes.HWND
+    hwnd = user32.WindowFromPoint(wintypes.POINT(int(x), int(y)))
+    root = user32.GetAncestor(hwnd, 2) if hwnd else None          # GA_ROOT
+    fg = user32.GetForegroundWindow()
+    if not root or root == fg:
+        return False
+    cls = ctypes.create_unicode_buffer(64)
+    user32.GetClassNameW(root, cls, 64)
+    if cls.value in ("Shell_TrayWnd", "Progman", "WorkerW") or _is_popup_class(cls.value):
+        return False                                   # hlavní panel, plocha a menu se aktivují samy
+    user32.keybd_event(0x12, 0, 0, 0)                  # Alt odemkne převzetí popředí procesem na pozadí
+    user32.keybd_event(0x12, 0, 2, 0)
+    user32.SetForegroundWindow(root)
+    time.sleep(0.25)
+    return True
+
+
+def drag(x1: int, y1: int, x2: int, y2: int, button: str = "left", duration: float = 0.6) -> None:
+    """Přetažení jako člověk: stisk, plynulý pohyb, puštění (okna, soubory, posuvníky, výběr textu)."""
+    import pyautogui
+
+    dpi_aware()
+    activate_at(x1, y1)
+    pyautogui.moveTo(x1, y1, duration=0.15)
+    time.sleep(0.08)
+    pyautogui.mouseDown(button=button)
+    time.sleep(0.12)
+    pyautogui.moveTo(x2, y2, duration=duration, tween=pyautogui.easeInOutQuad)
+    time.sleep(0.12)
+    pyautogui.mouseUp(button=button)
+
+
+def button(down: bool, button: str = "left") -> None:
+    import pyautogui
+
+    (pyautogui.mouseDown if down else pyautogui.mouseUp)(button=button)
+
+
+def middle_click(x: int, y: int) -> None:
+    import pyautogui
+
+    dpi_aware()
+    pyautogui.moveTo(x, y, duration=0)
+    pyautogui.middleClick()
+
+
+def cursor() -> tuple[int, int]:
+    import pyautogui
+
+    p = pyautogui.position()
+    return int(p[0]), int(p[1])
+
+
+def scroll_by(clicks: int, horizontal: bool = False, at: tuple[int, int] | None = None) -> None:
+    import pyautogui
+
+    if at:
+        pyautogui.moveTo(*at, duration=0.12)
+    (pyautogui.hscroll if horizontal else pyautogui.scroll)(int(clicks) * 120)
+
+
+def screen_locked() -> bool:
+    """Zamčená obrazovka (nebo UAC): vstupní plocha není „Default“ – myš ani klávesnice tam nedosáhnou."""
+    if not WIN:
+        return False
+    from ctypes import wintypes
+
+    user32 = ctypes.windll.user32
+    h = user32.OpenInputDesktop(0, False, 0x0100)          # DESKTOP_READOBJECTS
+    if not h:
+        return True
+    try:
+        buf = ctypes.create_unicode_buffer(64)
+        need = wintypes.DWORD()
+        ok = user32.GetUserObjectInformationW(h, 2, buf, ctypes.sizeof(buf), ctypes.byref(need))  # UOI_NAME
+        return bool(ok) and buf.value.lower() != "default"
+    finally:
+        user32.CloseDesktop(h)
+
+
+def keep_awake(on: bool) -> None:
+    """Během práce se počítač neuspí ani nezhasne obrazovku (a tím se nezamkne)."""
+    if WIN:
+        es = 0x80000000 | ((0x00000001 | 0x00000002) if on else 0)   # CONTINUOUS | SYSTEM | DISPLAY
+        ctypes.windll.kernel32.SetThreadExecutionState(es)
+
+
 KEY_ALIASES = {"plus": "add", "minus": "subtract", "-": "subtract", "escape": "esc", "return": "enter",
                "windows": "win", "super": "win", "cmd": "win", "meta": "win", "control": "ctrl", "del": "delete",
                "pgdn": "pagedown", "pgup": "pageup", "page_down": "pagedown", "page_up": "pageup",

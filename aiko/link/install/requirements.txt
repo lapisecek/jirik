@@ -1,0 +1,14 @@
+websockets>=12
+pillow>=10.1
+psutil>=5.9
+mss>=9
+pyautogui>=0.9.54
+pywinauto>=0.6.8
+winrt-runtime>=3
+winrt-Windows.Foundation>=3
+winrt-Windows.Foundation.Collections>=3
+winrt-Windows.Globalization>=3
+winrt-Windows.Graphics.Imaging>=3
+winrt-Windows.Media.Ocr>=3
+winrt-Windows.Storage.Streams>=3
+cryptography>=42

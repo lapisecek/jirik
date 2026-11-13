@@ -128,9 +128,17 @@ class PcAgent(DeviceAgent):
     def __init__(self, *a: Any, dry_run: bool = False, **kw: Any):
         super().__init__(*a, **kw)
         self.dry_run = dry_run
+        if WIN and not dry_run:              # seznam aplikací z nabídky Start předem – první „otevři“ je pak hned
+            import threading
+
+            threading.Thread(target=self._start_apps, daemon=True).start()
 
     async def status(self) -> dict[str, Any]:
         st: dict[str, Any] = {"dry_run": self.dry_run}
+        try:
+            st["locked"] = pc_gui.screen_locked()
+        except Exception:  # noqa: BLE001
+            pass
         try:
             # co je na počítači otevřené – porozumění pak ví, že „zprávy“ znamenají novinky v prohlížeči
             title = pc_gui.foreground_title()
@@ -461,7 +469,7 @@ class PcAgent(DeviceAgent):
         if re.search(r'["&|<>^%\r\n]', app_id):
             raise ToolRefused("neplatná aplikace")
         run(["explorer.exe", f"shell:AppsFolder\\{app_id}"], timeout=15)
-        time.sleep(3.0)
+        time.sleep(1.2)
         return {"started": True, "app": best["Name"], "window": pc_gui.foreground_title()}
 
     def _start_apps(self) -> list[dict[str, Any]]:
@@ -740,6 +748,203 @@ class PcAgent(DeviceAgent):
             results.append(self.execute_action(**{k: v for k, v in act.items() if k in keys}))
         return {"results": results}
 
+    # --- ovládání plochy jako člověk (souřadnice 0–1000 vůči zachycenému monitoru) ---------------
+    @tool("Snímek obrazovky pro práci myší: obrázek s očíslovanými prvky, seznam prvků se středem v souřadnicích "
+          "0–1000 (x zleva, y shora), poloha kurzoru, aktivní a otevřená okna.")
+    def desktop_view(self, marks: bool = True) -> dict[str, Any]:
+        import io
+
+        from PIL import Image
+
+        pc_gui.keep_awake(True)
+        if pc_gui.screen_locked():
+            return {"locked": True, "error": "Obrazovka je zamčená – myš ani klávesnice teď nic neudělají."}
+        title = pc_gui.foreground_title()
+        if is_blocked_window(title):
+            return {"blocked": True, "active_window": title,
+                    "error": "V popředí je chráněné okno (banka, hesla, vzdálený přístup)."}
+        png, mon = pc_gui.screenshot()
+        elements, texts = pc_gui.ui_snapshot(mon, numbered=False)
+        image = Image.open(io.BytesIO(png))
+        try:
+            segments = pc_gui.ocr_segments(pc_gui.ocr_lines(image))
+            elements = pc_gui.merge_ocr(elements, segments, focus=pc_gui.foreground_rect(mon))
+        except Exception as e:  # noqa: BLE001
+            log.warning("OCR selhalo: %s", e)
+        elements = som.number(elements, limit=90)
+        webp, scale, size = som.render(image, elements if marks else [], max_side=1366)
+        self._elements, self._scale, self._monitor = elements, scale, mon
+        ox, oy, w, h = mon
+        cx, cy = pc_gui.cursor()
+
+        def rel(px: float, py: float) -> list[int]:
+            return [round(px * 1000 / max(w, 1)), round(py * 1000 / max(h, 1))]
+
+        return {"image_webp_base64": webp, "screen": [w, h], "active_window": title,
+                "cursor": rel(cx - ox, cy - oy),
+                "elements": [{"id": e.id, "label": e.label[:60], "kind": e.kind, "at": rel(*e.center)}
+                             for e in elements],
+                "open_windows": [t for t in pc_gui.open_windows() if not is_blocked_window(t)][:12],
+                "text": [t[:80] for t in texts[:40]]}
+
+    @tool("Myš a klávesnice jako člověk. action: click | double_click | right_click | middle_click | move | drag | "
+          "scroll | type | key | mouse_down | mouse_up | wait. Cíl: element (číslo z desktop_view) nebo x,y "
+          "v 0–1000; drag končí na to_x,to_y. scroll: direction up/down/left/right, amount = kroky. "
+          "type: text (volitelně nejdřív klik na cíl). key: keys např. „ctrl+s“, „enter“, „win“. "
+          "look=true vrátí po akci nový snímek.")
+    def desktop_act(self, action: str, x: int = -1, y: int = -1, to_x: int = -1, to_y: int = -1, element: int = 0,
+                    text: str = "", keys: str = "", direction: str = "down", amount: int = 3,
+                    look: bool = True) -> dict[str, Any]:
+        pc_gui.keep_awake(True)
+        if pc_gui.screen_locked():
+            return {"locked": True, "error": "Obrazovka je zamčená – akci nejde provést."}
+        a = (action or "").lower().strip()
+        title = pc_gui.foreground_title()
+        if is_blocked_window(title):
+            raise ToolRefused("V tomhle okně Jiřík nic nedělá (banka, hesla, vzdálený přístup).")
+        mon = getattr(self, "_monitor", None)
+        if mon is None:
+            _, mon = pc_gui.screenshot()
+            self._monitor = mon
+        ox, oy, w, h = mon
+        elements = getattr(self, "_elements", [])
+
+        def absolute(rx: int, ry: int) -> tuple[int, int]:
+            if not (0 <= rx <= 1000 and 0 <= ry <= 1000):
+                raise ValueError(f"souřadnice {rx},{ry} jsou mimo obrazovku – x i y musí být 0–1000")
+            # 1 px od rohu: pyautogui ve skutečném rohu obrazovky záměrně zastaví (nouzová brzda uživatele)
+            px = min(max(int(round(rx * w / 1000)), 1), w - 2)
+            py = min(max(int(round(ry * h / 1000)), 1), h - 2)
+            return ox + px, oy + py
+
+        el = None
+        target: tuple[int, int] | None = None
+        if element:
+            el = next((e for e in elements if e.id == int(element)), None)
+            if el is None:
+                raise ValueError(f"prvek {element} na posledním snímku není – zavolej nejdřív screenshot")
+            target = (ox + el.center[0], oy + el.center[1])
+        elif x >= 0 and y >= 0:
+            target = absolute(x, y)
+            el = som.element_at(elements, target[0] - ox, target[1] - oy)
+        if a in ("click", "double_click", "right_click", "middle_click", "move", "drag", "mouse_down") \
+                and target is None:
+            raise ValueError("chybí cíl: element nebo x,y (0–1000)")
+        if a == "type" and ((el and el.password) or looks_like_code(text)):
+            raise ToolRefused("Hesla a ověřovací kódy Jiřík nepíše – zadejte je prosím sami.")
+        if a == "key" and re.sub(r"\s+", "", keys.lower()) in ("win+l", "ctrl+alt+del", "ctrl+alt+delete"):
+            raise ToolRefused("Zamknutí počítače Jiřík nepoužívá – už by se nedostal zpátky.")
+        if self.dry_run:
+            return {"dry_run": True, "action": a}
+        if target and a in ("click", "double_click", "right_click", "middle_click", "type", "scroll"):
+            pc_gui.activate_at(*target)
+        if a == "click":
+            pc_gui.click(*target)
+        elif a == "double_click":
+            pc_gui.click(*target, double=True)
+        elif a == "right_click":
+            pc_gui.click(*target, right=True)
+        elif a == "middle_click":
+            pc_gui.middle_click(*target)
+        elif a == "move":
+            pc_gui.move(*target)
+        elif a == "drag":
+            if to_x < 0 or to_y < 0:
+                raise ValueError("drag potřebuje to_x a to_y")
+            pc_gui.drag(*target, *absolute(to_x, to_y))
+        elif a == "scroll":
+            n = max(1, min(int(amount or 3), 30))
+            d = (direction or "down").lower()
+            pc_gui.scroll_by(-n if d in ("down", "right") else n, horizontal=d in ("left", "right"), at=target)
+        elif a == "type":
+            if target:
+                pc_gui.click(*target)
+                time.sleep(0.25)
+            pc_gui.type_text(text)
+        elif a == "key":
+            for k in (keys or "").split():
+                pc_gui.press(k)
+                time.sleep(0.06)
+        elif a in ("mouse_down", "mouse_up"):
+            if target:
+                pc_gui.move(*target, duration=0.1)
+            pc_gui.button(a == "mouse_down")
+        elif a == "wait":
+            time.sleep(max(0.2, min(float(amount or 1), 15)))
+        else:
+            raise ValueError(f"neznámá akce {action}")
+        out: dict[str, Any] = {"done": a, "label": el.label[:60] if el else ""}
+        if look:
+            time.sleep(0.9 if a in ("double_click", "key", "type") else 0.55)
+            view = self.desktop_view()
+            out.update({k: v for k, v in view.items()})
+        return out
+
+    # --- univerzální nástroje pro chat -------------------------------------------------------
+    @tool("Spustí PowerShell skript na tomto počítači a vrátí výstup. Umí skoro vše: soubory, složky, "
+          "aplikace, nastavení, procesy, síť, informace o systému, instalace přes winget.")
+    def run_powershell(self, script: str, timeout: int = 60) -> dict[str, Any]:
+        script = str(script or "").strip()
+        if not script:
+            raise ValueError("prázdný skript")
+        bad = destructive_script(script)
+        if bad:
+            raise ToolRefused(f"Tohle by mohlo nevratně poškodit systém ({bad}) – Aiko to nespustí.")
+        if self.dry_run:
+            return {"dry_run": True, "script": script[:200]}
+        wrapped = ("$ProgressPreference='SilentlyContinue'; [Console]::OutputEncoding=[Text.Encoding]::UTF8; "
+                   "$OutputEncoding=[Text.Encoding]::UTF8; " + script)
+        t0 = time.time()
+        code, out = ps(wrapped, timeout=max(5, min(int(timeout or 60), 600)))
+        if len(out) > 12000:
+            out = out[:4000] + "\n…(zkráceno)…\n" + out[-7000:]
+        return {"exit_code": code, "output": out, "seconds": round(time.time() - t0, 1)}
+
+    @tool("Otevře cokoli: webovou adresu (v prohlížeči), soubor nebo složku podle cesty, nebo aplikaci podle "
+          "jména (např. „Spotify“, „Word“, „Kalkulačka“).")
+    def open_target(self, target: str) -> dict[str, Any]:
+        import os
+        from pathlib import Path
+
+        t = str(target or "").strip().strip('"')
+        if not t:
+            raise ValueError("chybí co otevřít")
+        if re.match(r"^(https?://|www\.)|^[\w-]+(\.[\w-]+)+(/\S*)?$", t, re.I) and not os.path.exists(t):
+            url = t if t.lower().startswith("http") else "https://" + t
+            if is_blocked_url(url):
+                raise ToolRefused("Tuhle stránku Aiko neotevírá.")
+            if not self.dry_run:
+                webbrowser.open(url, new=2)
+            return {"opened": url, "kind": "web"}
+        p = Path(os.path.expandvars(os.path.expanduser(t)))
+        if p.exists():
+            if not self.dry_run:
+                os.startfile(str(p))  # type: ignore[attr-defined]
+            return {"opened": str(p), "kind": "folder" if p.is_dir() else "file"}
+        r = self.start_app(t)
+        if r.get("started") or r.get("dry_run"):
+            return {"opened": r.get("app", t), "kind": "app", "window": r.get("window", "")}
+        if re.match(r"^[\w.-]+$", t) and shutil.which(t):
+            if not self.dry_run:
+                subprocess.Popen([shutil.which(t)], creationflags=getattr(subprocess, "DETACHED_PROCESS", 0))
+            return {"opened": t, "kind": "program"}
+        return {"opened": "", "error": f"„{t}“ jsem nenašla", "similar_apps": r.get("candidates", [])}
+
+    @tool("Stiskne klávesu nebo zkratku v aktivním okně (např. „ctrl+c“, „enter“, „volumeup“, „playpause“, "
+          "„win+d“), nebo napíše text (text=…).")
+    def keyboard(self, keys: str = "", text: str = "") -> dict[str, Any]:
+        if self.dry_run:
+            return {"dry_run": True}
+        if text:
+            pc_gui.type_text(str(text))
+        if keys:
+            if is_forbidden_key(keys):
+                raise ToolRefused("Tuhle zkratku Aiko nepoužívá.")
+            for k in str(keys).split():
+                pc_gui.press(k)
+                time.sleep(0.08)
+        return {"done": True, "window": pc_gui.foreground_title()}
+
     @tool("Jen čtecí systémový příkaz pro diagnostiku: ipconfig, ping, nslookup, tracert, "
           "netsh wlan show interfaces, systeminfo, tasklist, getmac.")
     def shell_read(self, command: str) -> dict[str, Any]:
@@ -756,6 +961,37 @@ class PcAgent(DeviceAgent):
             args[1:1] = ["-n" if WIN else "-c", "2"]
         code, out = run(args, timeout=30)
         return {"code": code, "output": out[-8000:]}
+
+
+
+# Pojistka proti nevratným škodám. Model je malý a čte i texty z webu – jeden špatný příkaz nesmí
+# smazat disk ani vypnout ochranu systému. Běžná práce (soubory uživatele, nastavení, instalace) projde.
+_DESTRUCTIVE = [
+    (r"\bformat(-volume)?\b\s+[a-z]:?|\bformat-volume\b|\bclear-disk\b|\binitialize-disk\b|\bdiskpart\b", "formátování disku"),
+    (r"\bremove-partition\b|\bset-partition\b.*-isactive", "oddíly disku"),
+    (r"\bbcdedit\b|\bbootrec\b|\bbcdboot\b", "zavaděč systému"),
+    (r"\bvssadmin\b.*\bdelete\b|\bwbadmin\b.*\bdelete\b|\bwmic\b.*shadowcopy.*delete", "zálohy systému"),
+    (r"\bcipher\b.*\s/w", "přepis disku"),
+    (r"(remove-item|\brm\b|\bdel\b|\brd\b|\brmdir\b|\bri\b).*(\b[a-z]:\\?\s*['\"]?\s*(-\w+\s*)*$|[a-z]:\\(windows|program files|users)\\?\s*($|[\s'\"]))", "mazání systémových složek"),
+    (r"(remove-item|\brm\b|\bdel\b|\brd\b|\brmdir\b).*(\$env:(systemroot|windir|programfiles)|system32)", "mazání systémových souborů"),
+    (r"\breg(\.exe)?\s+delete\s+hklm|remove-item\s+.*hklm:", "mazání registru systému"),
+    (r"set-mppreference.*-disable|\badd-mppreference\b.*-exclusion", "vypnutí antiviru"),
+    (r"\bnetsh\s+advfirewall\s+set\s+\w+\s+state\s+off|set-netfirewallprofile.*-enabled\s+(false|0)", "vypnutí firewallu"),
+    (r"\bnet\s+user\b.*\s(/add|/delete)|\b(new|remove)-localuser\b|\badd-localgroupmember\b", "uživatelské účty"),
+    (r"\btakeown\b.*system32|\bicacls\b.*system32", "práva systémových souborů"),
+    (r"invoke-expression.*(downloadstring|iwr|invoke-webrequest)|\biex\b.*(downloadstring|iwr|irm|invoke-webrequest)|"
+     r"(iwr|irm|invoke-webrequest|invoke-restmethod|downloadstring)[^|]*\|\s*(iex|invoke-expression)", "spuštění kódu z internetu"),
+    (r"-encodedcommand|\s-enc\s", "skrytý příkaz"),
+]
+_DESTRUCTIVE_RE = [(re.compile(rx, re.I | re.S), why) for rx, why in _DESTRUCTIVE]
+
+
+def destructive_script(script: str) -> str:
+    """Důvod, proč skript nespustit, nebo prázdný řetězec."""
+    for rx, why in _DESTRUCTIVE_RE:
+        if rx.search(script):
+            return why
+    return ""
 
 
 def _desktop_icons_visible() -> bool:
@@ -960,7 +1196,7 @@ def main() -> None:
     a = p.parse_args()
     setup_logging(a.verbose)
     agent = PcAgent(a.name or f"Počítač {socket.gethostname()}", device_id=a.device_id,
-                    server_url=a.server, token=a.token, dry_run=a.dry_run)
+                    server_url=a.server, token=a.token, dry_run=a.dry_run, pin=a.pin, idle_exit=a.idle_exit)
     try:
         asyncio.run(agent.run())
     except KeyboardInterrupt:

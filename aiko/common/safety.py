@@ -210,7 +210,7 @@ def is_blocked_url(url: str | None) -> bool:
     if not url:
         return False
     u = url.lower()
-    return any(d in u for d in BLOCKED_DOMAINS) or "bank" in u
+    return any(d in u for d in BLOCKED_DOMAINS)
 
 
 def valid_package(pkg: str) -> bool:

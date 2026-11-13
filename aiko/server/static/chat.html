@@ -3,451 +3,1307 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Aiko</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%234f6bed'/><circle cx='16' cy='16' r='6' fill='white'/></svg>">
+<meta name="color-scheme" content="light dark">
+<title>Jiřík</title>
+<link rel="icon" href="/static/jirik.svg">
 <style>
+/* ============ tokeny ============ */
+:root {
+  --paper: #F4F2EE; --surface: #FBFAF8; --sunk: #ECE9E3; --ink: #1B1A17; --ink-2: #4A4740; --mute: #8A867D;
+  --line: #E2DED6; --line-2: #D3CEC4; --accent: #E0492A; --accent-ink: #FFFFFF; --accent-soft: #F7DDD5;
+  --ok: #2F8F5B; --warn: #C98A12; --bad: #C8361B; --me: #1B1A17; --me-ink: #F4F2EE; --cap: #2B2824;
+  --shadow: 0 1px 0 rgba(27,26,23,.04), 0 8px 24px -12px rgba(27,26,23,.18);
+  --pop: 0 1px 0 rgba(27,26,23,.04), 0 18px 48px -18px rgba(27,26,23,.35);
+  --sans: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --display: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  --mono: "Cascadia Mono", "Cascadia Code", Consolas, ui-monospace, monospace;
+  --spring: cubic-bezier(.22, 1.18, .36, 1);
+  --out: cubic-bezier(.16, 1, .3, 1);
+  --head: 52px;
+}
+@media (prefers-color-scheme: dark) {
   :root {
-    --bg: #f6f7f9; --panel: #ffffff; --ink: #15171a; --mute: #6b7280; --line: #e6e8ec;
-    --accent: #4f6bed; --accent-ink: #ffffff; --accent-soft: #eef1fd; --aiko: #ffffff; --ok: #1f9d55; --warn: #d97706;
-    --bad: #dc2626; --shadow: 0 1px 2px rgba(16,24,40,.05), 0 4px 16px rgba(16,24,40,.06); --radius: 18px;
+    --paper: #131210; --surface: #1B1A17; --sunk: #22201C; --ink: #EEEBE4; --ink-2: #C4BFB4; --mute: #8C877C;
+    --line: #2A2824; --line-2: #3A3732; --accent: #F0603E; --accent-ink: #160B07; --accent-soft: #3A1E15;
+    --ok: #4CB27A; --warn: #E0A53A; --bad: #F06A4C; --me: #EEEBE4; --me-ink: #131210; --cap: #5E574D;
+    --shadow: 0 1px 0 rgba(0,0,0,.2), 0 10px 30px -14px rgba(0,0,0,.6);
+    --pop: 0 1px 0 rgba(0,0,0,.25), 0 22px 60px -20px rgba(0,0,0,.8);
   }
-  @media (prefers-color-scheme: dark) {
-    :root { --bg: #0f1115; --panel: #171a20; --ink: #e9ebef; --mute: #9aa1ad; --line: #262a33; --accent: #6d84ff;
-            --accent-soft: #1d2340; --aiko: #1c2027; --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 20px rgba(0,0,0,.25); }
-  }
-  * { box-sizing: border-box; }
-  html, body { height: 100%; margin: 0; }
-  body { background: var(--bg); color: var(--ink); font: 16px/1.5 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
-         -webkit-font-smoothing: antialiased; }
-  button { font: inherit; color: inherit; cursor: pointer; }
+}
+*, *::before, *::after { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body { background: var(--paper); color: var(--ink); font: 15.5px/1.6 var(--sans); -webkit-font-smoothing: antialiased;
+       overflow: hidden; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+input, textarea { font: inherit; color: inherit; }
+::selection { background: var(--accent); color: var(--accent-ink); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+svg { display: block; flex: none; }
+[hidden] { display: none !important; }
 
-  /* --- úvodní načítání --- */
-  #boot { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; background: var(--bg);
-          transition: opacity .45s ease, visibility .45s; }
-  #boot.gone { opacity: 0; visibility: hidden; }
-  .boot-inner { display: flex; flex-direction: column; align-items: center; gap: 18px; color: var(--mute); }
-  .orb { width: 64px; height: 64px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #8aa0ff, var(--accent));
-         box-shadow: 0 0 0 0 rgba(79,107,237,.45); animation: pulse 1.8s ease-out infinite; }
-  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(79,107,237,.45); transform: scale(.96); }
-                     70% { box-shadow: 0 0 0 22px rgba(79,107,237,0); transform: scale(1); }
-                     100% { box-shadow: 0 0 0 0 rgba(79,107,237,0); transform: scale(.96); } }
+/* ============ posuvníky ============ */
+* { scrollbar-width: thin; scrollbar-color: var(--line-2) transparent; }
+::-webkit-scrollbar { width: 12px; height: 12px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 12px; border: 4px solid transparent;
+                            background-clip: content-box; min-height: 40px; }
+::-webkit-scrollbar-thumb:hover { background-color: var(--mute); border-width: 3px; }
+::-webkit-scrollbar-corner { background: transparent; }
 
-  /* --- rozvržení --- */
-  .app { height: 100%; display: flex; flex-direction: column; max-width: 860px; margin: 0 auto; }
-  header { display: flex; align-items: center; gap: 10px; padding: 14px 20px; }
-  .brand { display: flex; align-items: center; gap: 10px; font-weight: 650; font-size: 18px; flex: 1; letter-spacing: -.01em; }
-  .brand .mini-orb { width: 26px; height: 26px; border-radius: 50%;
-                     background: radial-gradient(circle at 35% 30%, #8aa0ff, var(--accent)); transition: transform .3s; }
-  .brand.busy .mini-orb { animation: breathe 1.4s ease-in-out infinite; }
-  @keyframes breathe { 50% { transform: scale(.82); opacity: .75; } }
-  .chip { display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px; border-radius: 999px;
-          border: 1px solid var(--line); background: var(--panel); font-size: 13px; color: var(--mute); white-space: nowrap;
-          transition: border-color .2s, color .2s, background .2s; }
-  .chip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--bad); transition: background .3s; }
-  .chip.ok .dot { background: var(--ok); }
-  .chip.wait .dot { background: var(--warn); animation: blink 1s ease-in-out infinite; }
-  @keyframes blink { 50% { opacity: .3; } }
-  button.chip:hover { border-color: var(--accent); color: var(--ink); }
-  button.chip:active { transform: scale(.97); }
-  .icon-btn { width: 36px; height: 32px; padding: 0; justify-content: center; }
-  .icon-btn svg { width: 17px; height: 17px; }
-  .icon-btn.off { opacity: .55; }
-  .spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent;
-          animation: rot .7s linear infinite; display: inline-block; }
-  @keyframes rot { to { transform: rotate(360deg); } }
+/* ============ značka: Jiřík ============ */
+.mark { width: 24px; height: 24px; position: relative; flex: none; }
+.mark svg { width: 100%; height: 100%; overflow: visible; }
+.mark .hd { transform-origin: 16px 27px; transition: transform .5s var(--spring); }
+.mark .face, .mark .ear { fill: var(--accent); transition: fill .5s var(--out); }
+.mark .cap { fill: var(--cap); transition: fill .5s var(--out); }
+.mark .stache, .mark .brows { fill: #F4F2EE; transform-origin: 16px 24px; }
+.mark .seam { fill: none; stroke: rgba(244,242,238,.16); stroke-width: .8; stroke-linecap: round; }
+.mark .specs circle { fill: transparent; stroke: #F4F2EE; stroke-width: 1.45; transition: fill .45s var(--out); }
+.mark .specs path { fill: none; stroke: #F4F2EE; stroke-width: 1.3; stroke-linecap: round; }
+.mark .eyes { fill: #1B1A17; transform-box: fill-box; transform-origin: center; animation: blink 5.5s 1.5s infinite; }
+@keyframes blink { 0%, 93%, 100% { transform: scaleY(1); } 96% { transform: scaleY(.1); } }
+.busy .mark .hd, .live .mark .hd { animation: nod 1.5s cubic-bezier(.45,0,.55,1) infinite; }
+.busy .mark .stache, .live .mark .stache { animation: twitch 1.5s cubic-bezier(.45,0,.55,1) infinite; }
+.busy .mark .brows, .live .mark .brows { animation: brow 1.5s cubic-bezier(.45,0,.55,1) infinite; }
+.thinking .mark .brows { animation: frown 2.2s cubic-bezier(.45,0,.55,1) infinite; }
+@keyframes nod { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-7deg) translateY(.4px); }
+                 50% { transform: rotate(0) translateY(.9px); } 75% { transform: rotate(7deg) translateY(.4px); } }
+@keyframes twitch { 0%, 100% { transform: scaleX(1); } 50% { transform: scaleX(1.12) scaleY(.92); } }
+@keyframes brow { 50% { transform: translateY(-.7px); } }
+@keyframes frown { 50% { transform: translateY(.9px) scaleY(1.15); } }
+.uncensored .mark .specs circle { fill: #1B1A17; }
+.uncensored .mark .eyes { opacity: 0; }
 
-  #log { flex: 1; overflow-y: auto; padding: 8px 20px 24px; display: flex; flex-direction: column; gap: 14px;
-         scroll-behavior: smooth; }
-  .row { display: flex; animation: rise .32s cubic-bezier(.2,.8,.2,1) both; }
-  .row.me { justify-content: flex-end; }
-  @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-  .bubble { max-width: min(78%, 620px); padding: 11px 16px; border-radius: var(--radius); white-space: pre-wrap;
-            word-wrap: break-word; position: relative; }
-  .me .bubble { background: var(--accent); color: var(--accent-ink); border-bottom-right-radius: 6px; }
-  .aiko .bubble { background: var(--aiko); border: 1px solid var(--line); box-shadow: var(--shadow);
-                  border-bottom-left-radius: 6px; }
-  .bubble ol { margin: 8px 0 0; padding-left: 20px; }
-  .bubble li { margin: 3px 0; }
-  .bubble.speaking::after { content: ""; position: absolute; right: -26px; bottom: 6px; width: 16px; height: 14px;
-    background: linear-gradient(var(--accent),var(--accent)) 0 100%/3px 40% no-repeat,
-                linear-gradient(var(--accent),var(--accent)) 6px 100%/3px 90% no-repeat,
-                linear-gradient(var(--accent),var(--accent)) 12px 100%/3px 60% no-repeat;
-    animation: eq .9s ease-in-out infinite; }
-  @keyframes eq { 0%,100% { background-size: 3px 40%, 3px 90%, 3px 60%; }
-                  33% { background-size: 3px 90%, 3px 40%, 3px 80%; }
-                  66% { background-size: 3px 60%, 3px 70%, 3px 30%; } }
-  .note { align-self: center; font-size: 13px; color: var(--mute); padding: 4px 12px; border-radius: 999px;
-          background: var(--panel); border: 1px solid var(--line); animation: rise .3s ease both; }
-  .note.err { color: var(--bad); }
+/* ============ úvodní načítání ============ */
+#boot { position: fixed; inset: 0; z-index: 90; background: var(--paper); display: grid; place-items: center;
+        transition: opacity .5s var(--out), visibility .5s; }
+#boot.gone { opacity: 0; visibility: hidden; }
+#boot .mark { width: 52px; height: 52px; margin: auto; animation: pop .8s var(--spring) both; }
+#boot .mark .hd { animation: nod 1.5s cubic-bezier(.45,0,.55,1) infinite; }
+#bootText { margin-top: 18px; color: var(--mute); font-size: 13px; text-align: center; min-height: 20px; }
 
-  /* přemýšlí / pracuje */
-  .typing .bubble { display: flex; align-items: center; gap: 12px; color: var(--mute); }
-  .dots { display: inline-flex; gap: 4px; }
-  .dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); opacity: .35;
-            animation: hop 1.2s ease-in-out infinite; }
-  .dots i:nth-child(2) { animation-delay: .15s; } .dots i:nth-child(3) { animation-delay: .3s; }
-  @keyframes hop { 0%,60%,100% { transform: none; opacity: .35; } 30% { transform: translateY(-5px); opacity: 1; } }
-  .typing .status { font-size: 14px; transition: opacity .2s; }
-  .typing .secs { font-size: 12px; opacity: .7; font-variant-numeric: tabular-nums; }
+/* ============ záhlaví ============ */
+.app { height: 100%; display: grid; grid-template-rows: var(--head) minmax(0, 1fr); }
+header { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 10px;
+         padding: 0 12px 0 18px; border-bottom: 1px solid transparent; transition: border-color .3s;
+         position: relative; z-index: 5; background: var(--paper); }
+header.scrolled { border-bottom-color: var(--line); }
+.brand { display: flex; align-items: center; gap: 10px; font: 600 16px/1 var(--display); letter-spacing: -.01em;
+         white-space: nowrap; min-width: 0; }
+.badge { font: 600 10px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; padding: 5px 7px 4px;
+         border-radius: 5px; background: var(--ink); color: var(--paper); transform-origin: left center;
+         transition: opacity .35s var(--out), transform .45s var(--spring), max-width .45s var(--out), padding .45s var(--out);
+         max-width: 120px; overflow: hidden; }
+.badge.hidden { opacity: 0; transform: scale(.6); max-width: 0; padding-left: 0; padding-right: 0; }
+.right { display: flex; align-items: center; justify-content: flex-end; gap: 4px; min-width: 0; }
 
-  .quick { display: flex; gap: 8px; margin-top: 2px; animation: rise .3s ease both; }
-  .quick button { border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 7px 18px;
-                  transition: background .15s, border-color .15s, transform .1s; }
-  .quick button:hover { border-color: var(--accent); background: var(--accent-soft); }
-  .quick button:active { transform: scale(.96); }
+.tabs { position: relative; display: flex; padding: 3px; border-radius: 12px; background: var(--sunk); }
+.tabs button { position: relative; z-index: 1; height: 30px; padding: 0 14px; border-radius: 9px; font-size: 13.5px;
+               font-weight: 600; color: var(--mute); display: flex; align-items: center; gap: 7px;
+               transition: color .25s var(--out); white-space: nowrap; }
+.tabs button.on { color: var(--ink); }
+.tabs button svg { width: 15px; height: 15px; }
+.tabs .ind { position: absolute; top: 3px; bottom: 3px; left: 0; border-radius: 9px; background: var(--surface);
+             box-shadow: 0 1px 2px rgba(0,0,0,.08); transition: transform .45s var(--spring), width .45s var(--spring); }
+.tabs .cnt { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--line-2);
+             font: 600 10.5px/18px var(--mono); color: var(--ink-2); text-align: center; }
 
-  /* úvod */
-  .hello { margin: auto 0; text-align: center; padding: 24px 0; animation: rise .5s ease both; }
-  .hello h2 { font-size: 28px; font-weight: 650; margin: 14px 0 6px; letter-spacing: -.02em; }
-  .hello p { color: var(--mute); margin: 0 0 22px; }
-  .hello .orb { margin: 0 auto; width: 52px; height: 52px; }
-  .ideas { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; text-align: left; }
-  .ideas button { border: 1px solid var(--line); background: var(--panel); border-radius: 14px; padding: 12px 14px;
-                  text-align: left; box-shadow: var(--shadow); transition: transform .15s, border-color .15s; }
-  .ideas button:hover { transform: translateY(-2px); border-color: var(--accent); }
-  .ideas b { display: block; font-weight: 600; font-size: 14px; }
-  .ideas span { font-size: 13px; color: var(--mute); }
+.status { display: flex; align-items: center; gap: 8px; font: 12px/1 var(--mono); color: var(--mute);
+          padding: 0 8px; height: 30px; white-space: nowrap; min-width: 0; overflow: hidden; }
+.status .txt { overflow: hidden; text-overflow: ellipsis; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--mute); flex: none;
+       transition: background-color .4s, transform .4s var(--spring); }
+.dot.ok { background: var(--ok); } .dot.warn { background: var(--warn); } .dot.bad { background: var(--bad); }
+.dot.pulse { animation: dotpulse 1.2s ease-in-out infinite; }
+@keyframes dotpulse { 50% { transform: scale(.55); } }
+.iconbtn { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; color: var(--ink-2);
+           transition: background-color .18s, color .18s, transform .25s var(--spring); position: relative; flex: none; }
+.iconbtn:hover { background: var(--sunk); color: var(--ink); }
+.iconbtn:active { transform: scale(.9); }
+.iconbtn svg { width: 18px; height: 18px; }
+.iconbtn.off { color: var(--mute); }
+.iconbtn .slash { stroke-dasharray: 30; stroke-dashoffset: 30; transition: stroke-dashoffset .35s var(--out); }
+.iconbtn.off .slash { stroke-dashoffset: 0; }
+.iconbtn .waves { transition: opacity .25s, transform .35s var(--spring); transform-origin: 40% 50%; }
+.iconbtn.off .waves { opacity: 0; transform: scale(.6); }
+.sep { width: 1px; height: 18px; background: var(--line); margin: 0 4px; flex: none; }
 
-  /* vstup */
-  .composer { padding: 10px 20px 20px; }
-  .box { display: flex; align-items: flex-end; gap: 8px; background: var(--panel); border: 1px solid var(--line);
-         border-radius: 20px; padding: 8px 8px 8px 16px; box-shadow: var(--shadow); transition: border-color .2s, box-shadow .2s; }
-  .box:focus-within { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
-  textarea { flex: 1; border: 0; outline: 0; resize: none; background: transparent; color: var(--ink); font: inherit;
-             padding: 7px 0; max-height: 160px; line-height: 1.45; overflow-y: hidden; }
-  textarea.scroll { overflow-y: auto; }
-  .send, .stop { width: 40px; height: 40px; border-radius: 50%; border: 0; display: grid; place-items: center;
-                 transition: transform .12s, opacity .2s, background .2s; flex: none; }
-  .send { background: var(--accent); color: #fff; }
-  .send:disabled { opacity: .35; cursor: default; }
-  .send:not(:disabled):active, .stop:active { transform: scale(.92); }
-  .stop { background: transparent; color: var(--bad); border: 1px solid var(--line); display: none; }
-  .stop.on { display: grid; animation: rise .2s ease both; }
-  .send svg, .stop svg { width: 18px; height: 18px; }
-  .hint { text-align: center; font-size: 12px; color: var(--mute); margin-top: 8px; }
+.electron-app header { -webkit-app-region: drag; padding-right: 146px; user-select: none; }
+.electron-app header button, .electron-app header .status { -webkit-app-region: no-drag; }
 
-  /* v aplikaci (Electron): záhlaví je zároveň lišta okna, vpravo jsou systémová tlačítka */
-  .electron-app header { -webkit-app-region: drag; min-height: 56px; padding-top: 8px; padding-bottom: 8px;
-                         padding-right: 150px; user-select: none; }
-  .electron-app header button, .electron-app header .chip { -webkit-app-region: no-drag; }
-  .electron-app #startAll { display: none; }
-  .electron-app .app { max-width: none; }
-  .electron-app #log, .electron-app .composer { width: 100%; max-width: 860px; margin-left: auto; margin-right: auto; }
+/* ============ prostory ============ */
+main { position: relative; min-height: 0; }
+.space { position: absolute; inset: 0; display: grid; grid-template-rows: minmax(0, 1fr) auto;
+         transition: opacity .35s var(--out), transform .45s var(--out); }
+.space.off { opacity: 0; pointer-events: none; transform: translateX(var(--dir, -14px)); }
+#spaceDevices { grid-template-columns: 284px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+#spaceDevices .chatcol { display: grid; grid-template-rows: minmax(0, 1fr) auto; min-width: 0; min-height: 0; }
 
-  @media (max-width: 600px) { header { padding: 10px 14px; } #log { padding: 8px 14px 20px; }
-                              .composer { padding: 8px 14px 14px; } #modelChip { display: none; }
-                              .bubble { max-width: 88%; } }
-  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+/* ============ zprávy ============ */
+.scroller { overflow-y: auto; overflow-x: hidden; position: relative; min-height: 0; }
+.log { max-width: 780px; margin: 0 auto; padding: 24px 24px 40px; display: flex; flex-direction: column; gap: 24px;
+       min-height: 100%; }
+.msg { display: flex; gap: 14px; animation: enter .5s var(--out) both; min-width: 0; }
+@keyframes enter { from { opacity: 0; transform: translateY(10px); } }
+@keyframes pop { from { transform: scale(.92); opacity: 0; } }
+@keyframes fade { from { opacity: 0; } }
+@keyframes spin { to { transform: rotate(360deg); } }
+.msg.me { justify-content: flex-end; }
+.msg.me .col { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; max-width: min(82%, 620px);
+               min-width: 0; }
+.msg.me .bubble { background: var(--me); color: var(--me-ink); padding: 10px 16px; border-radius: 18px 18px 6px 18px;
+                  max-width: 100%; white-space: pre-wrap; overflow-wrap: break-word; word-break: normal;
+                  animation: pop .45s var(--spring) both; transform-origin: right bottom; }
+.msg.me .tgt { font: 11.5px var(--mono); color: var(--mute); display: flex; align-items: center; gap: 6px; }
+.thumbs { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.thumbs img { width: 84px; height: 84px; object-fit: cover; border-radius: 12px; border: 1px solid var(--line);
+              animation: pop .45s var(--spring) both; cursor: zoom-in; }
+.thumbs .count { font: 12px var(--mono); color: var(--mute); }
+.who { padding-top: 2px; flex: none; }
+.who .mark { width: 24px; height: 24px; }
+.msg.aiko .body { flex: 1; min-width: 0; }
+
+/* přemýšlení */
+.reason { margin-bottom: 12px; border-left: 2px solid var(--line-2); padding-left: 12px; animation: fade .3s both; }
+.reason .rh { display: flex; align-items: center; gap: 8px; height: 26px; font-size: 13.5px; color: var(--mute);
+              font-weight: 600; transition: color .2s; }
+.reason .rh:hover { color: var(--ink); }
+.reason .rh svg { width: 14px; height: 14px; }
+.reason .chev { transition: transform .35s var(--spring); }
+.reason.open .chev { transform: rotate(90deg); }
+.reason .rb { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .45s var(--out); }
+.reason.open .rb { grid-template-rows: 1fr; }
+.reason .rb > div { overflow: hidden; min-height: 0; }
+.reason .rt { font-size: 13.5px; line-height: 1.55; color: var(--mute); white-space: pre-wrap; overflow-wrap: break-word;
+              max-height: 300px; overflow-y: auto; padding: 4px 2px 6px 0; }
+.reason.now .rh { color: var(--ink-2); }
+.reason.now .rh .lbl { background: linear-gradient(90deg, var(--mute) 0%, var(--ink) 50%, var(--mute) 100%) 0 0/200% 100%;
+                        -webkit-background-clip: text; background-clip: text; color: transparent;
+                        animation: sheen 1.6s linear infinite; }
+@keyframes sheen { to { background-position: -200% 0; } }
+
+/* nástroje */
+.tools { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.tools:empty { display: none; }
+.tool { display: grid; grid-template-columns: 16px minmax(0, 1fr); column-gap: 10px; align-items: start;
+        font: 12.5px/18px var(--mono); color: var(--ink-2); padding: 8px 12px; border: 1px solid var(--line);
+        border-radius: 10px; background: var(--surface); animation: slidein .45s var(--out) both;
+        transition: border-color .3s; }
+@keyframes slidein { from { opacity: 0; transform: translateX(-8px); } }
+.tool .ti { width: 16px; height: 16px; margin-top: 1px; display: grid; place-items: center; }
+.tool .ti svg { width: 16px; height: 16px; }
+.tool .ti .spin { animation: spin .9s linear infinite; color: var(--accent); }
+.tool .ti .ok { color: var(--ok); animation: pop .35s var(--spring) both; }
+.tool .ti .no { color: var(--bad); animation: pop .35s var(--spring) both; }
+.tool .ti .st { color: var(--mute); }
+.tool .tt { min-width: 0; }
+.tool .tl { overflow-wrap: break-word; word-break: break-word; }
+.tool .tdev { display: inline-block; font-weight: 600; color: var(--ink); background: var(--sunk); border-radius: 5px;
+              padding: 0 6px; margin-right: 7px; line-height: 18px; }
+.tool .tn { font: 13px/1.45 var(--sans); color: var(--ink-2); margin-bottom: 3px; overflow-wrap: break-word; }
+.tool .td { color: var(--mute); font-size: 11.5px; line-height: 16px; margin-top: 2px; overflow-wrap: break-word;
+            word-break: break-word; animation: fade .3s both; }
+.tool .shot { display: block; margin-top: 8px; width: min(100%, 300px); border-radius: 8px; border: 1px solid var(--line);
+              cursor: zoom-in; animation: pop .4s var(--spring) both; transition: transform .25s var(--spring); }
+.tool .shot:hover { transform: scale(1.015); }
+.tool.fail { border-color: color-mix(in srgb, var(--bad) 35%, var(--line)); }
+.tools .more { align-self: flex-start; font: 12px var(--mono); color: var(--mute); padding: 2px 6px; border-radius: 6px; }
+.tools .more:hover { color: var(--ink); background: var(--sunk); }
+
+/* text odpovědi */
+.md { overflow-wrap: break-word; }
+.md > :first-child { margin-top: 0; } .md > :last-child { margin-bottom: 0; }
+.md p { margin: 0 0 .75em; }
+.md h1, .md h2, .md h3 { font-family: var(--display); line-height: 1.25; margin: 1.1em 0 .45em; letter-spacing: -.01em; }
+.md h1 { font-size: 1.35em; } .md h2 { font-size: 1.2em; } .md h3 { font-size: 1.05em; }
+.md ul, .md ol { margin: 0 0 .75em; padding-left: 1.4em; }
+.md li { margin: .2em 0; } .md li::marker { color: var(--mute); }
+.md a { color: var(--accent); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px;
+        word-break: break-all; }
+.md strong { font-weight: 650; }
+.md blockquote { margin: 0 0 .75em; padding: 2px 0 2px 14px; border-left: 2px solid var(--line-2); color: var(--ink-2); }
+.md code { font: .88em var(--mono); background: var(--sunk); padding: .12em .4em; border-radius: 5px; }
+.md pre { position: relative; margin: 0 0 .8em; background: var(--surface); border: 1px solid var(--line);
+          border-radius: 12px; overflow: hidden; }
+.md pre code { display: block; padding: 14px 16px; background: none; overflow-x: auto; font-size: 13px; line-height: 1.55;
+               white-space: pre; }
+.md pre .lang { position: absolute; top: 9px; right: 44px; font: 10.5px/1 var(--mono); color: var(--mute);
+                text-transform: uppercase; letter-spacing: .06em; }
+.md pre .copy { position: absolute; top: 4px; right: 4px; }
+.md hr { border: 0; border-top: 1px solid var(--line); margin: 1.2em 0; }
+.md .tbl { overflow-x: auto; margin: 0 0 .8em; }
+.md table { border-collapse: collapse; font-size: .94em; }
+.md th, .md td { border: 1px solid var(--line); padding: 6px 10px; text-align: left; vertical-align: top; }
+.md th { background: var(--sunk); font-weight: 600; }
+.caret { display: inline-block; width: .5em; height: 1.05em; background: var(--accent); vertical-align: -.18em;
+         margin-left: 2px; border-radius: 2px; animation: caret 1s steps(1) infinite; }
+@keyframes caret { 50% { opacity: 0; } }
+.err { color: var(--bad); font-size: 14px; margin-top: 4px; animation: fade .3s both; }
+.notice { font: 12px/1.5 var(--mono); color: var(--warn); margin-bottom: 10px; animation: fade .3s both; }
+.stopped { color: var(--mute); font: 12px var(--mono); margin-top: 6px; animation: fade .3s both; }
+.think { display: inline-flex; gap: 5px; padding: 9px 0; }
+.think i { width: 7px; height: 7px; border-radius: 2px; background: var(--ink-2); animation: wave 1.1s var(--out) infinite; }
+.think i:nth-child(2) { animation-delay: .12s; } .think i:nth-child(3) { animation-delay: .24s; }
+@keyframes wave { 0%, 60%, 100% { transform: translateY(0); opacity: .3; } 30% { transform: translateY(-6px); opacity: 1; } }
+
+/* pod odpovědí */
+.meta { display: flex; align-items: center; gap: 2px; margin-top: 6px; height: 28px; opacity: 0; transition: opacity .2s; }
+.msg.aiko:hover .meta, .meta.has-speech { opacity: 1; }
+.meta .lvl { font: 11.5px/1 var(--mono); color: var(--mute); margin-right: 6px; white-space: nowrap; }
+.mini { height: 28px; min-width: 28px; padding: 0 7px; border-radius: 8px; display: inline-flex; align-items: center;
+        justify-content: center; gap: 6px; color: var(--mute); font: 12px var(--mono);
+        transition: background-color .15s, color .15s, transform .2s var(--spring); }
+.mini:hover { background: var(--sunk); color: var(--ink); }
+.mini:active { transform: scale(.92); }
+.mini svg { width: 15px; height: 15px; }
+.eq { display: none; align-items: flex-end; gap: 2px; height: 12px; }
+.speaking .eq { display: inline-flex; }
+.eq i { width: 2.5px; background: var(--accent); border-radius: 2px; animation: eq .9s ease-in-out infinite; transform-origin: bottom; }
+.eq i:nth-child(1) { height: 40%; } .eq i:nth-child(2) { height: 100%; animation-delay: .15s; }
+.eq i:nth-child(3) { height: 60%; animation-delay: .3s; } .eq i:nth-child(4) { height: 80%; animation-delay: .1s; }
+@keyframes eq { 50% { transform: scaleY(.35); } }
+
+/* prázdný chat */
+.hello { margin: auto 0; padding: 40px 0 10vh; animation: enter .7s var(--out) both; }
+.hello .mark { width: 56px; height: 56px; margin-bottom: 26px; animation: pop .7s var(--spring) both; }
+.hello h1 { font: 600 clamp(28px, 5vw, 40px)/1.12 var(--display); letter-spacing: -.025em; margin: 0; }
+.hello h1 span { color: var(--mute); display: block; animation: enter .7s .08s var(--out) both; }
+
+.down { position: sticky; bottom: 16px; margin: -48px auto 0; width: 36px; height: 36px; border-radius: 50%;
+        background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow); display: grid;
+        place-items: center; color: var(--ink-2); opacity: 0; transform: translateY(10px) scale(.9);
+        pointer-events: none; transition: opacity .25s, transform .35s var(--spring); z-index: 3; }
+.down.show { opacity: 1; transform: none; pointer-events: auto; }
+.down svg { width: 16px; height: 16px; }
+
+/* ============ vstup ============ */
+.composer { padding: 0 24px 18px; background: var(--paper); }
+.box { max-width: 780px; margin: 0 auto; background: var(--surface); border: 1px solid var(--line-2); border-radius: 20px;
+       transition: border-color .2s; box-shadow: var(--shadow); position: relative; }
+.box:focus-within { border-color: var(--ink-2); }
+.box.drag { border-color: var(--accent); border-style: dashed; }
+.attach { display: flex; gap: 8px; padding: 10px 12px 0; flex-wrap: wrap; }
+.attach:empty { display: none; }
+.att { position: relative; width: 56px; height: 56px; border-radius: 12px; overflow: hidden; border: 1px solid var(--line);
+       animation: pop .4s var(--spring) both; }
+.att img { width: 100%; height: 100%; object-fit: cover; }
+.att button { position: absolute; top: 3px; right: 3px; width: 18px; height: 18px; border-radius: 50%;
+              background: var(--ink); color: var(--paper); display: grid; place-items: center; opacity: 0; transition: opacity .15s; }
+.att:hover button { opacity: 1; }
+.att button svg { width: 10px; height: 10px; }
+.row { display: flex; align-items: flex-end; gap: 4px; padding: 7px; }
+.row textarea { flex: 1; min-width: 0; border: 0; outline: 0; resize: none; background: transparent; padding: 8px 6px;
+                max-height: 220px; line-height: 1.5; height: 38px; display: block; }
+.row textarea::placeholder { color: var(--mute); }
+.row textarea:focus-visible { outline: none; }
+.lvlbtn { height: 38px; padding: 0 10px 0 9px; border-radius: 12px; display: flex; align-items: center; gap: 8px;
+          font-size: 13px; font-weight: 600; color: var(--ink-2); white-space: nowrap; flex: none;
+          transition: background-color .15s, color .15s, transform .25s var(--spring); }
+.lvlbtn:hover, .lvlbtn.open { background: var(--sunk); color: var(--ink); }
+.lvlbtn:active { transform: scale(.95); }
+.bars { display: flex; align-items: flex-end; gap: 2px; height: 14px; }
+.bars i { width: 3px; border-radius: 1.5px; background: var(--line-2); transition: background-color .35s var(--out), height .35s var(--spring); }
+.bars i:nth-child(1) { height: 5px; } .bars i:nth-child(2) { height: 8px; } .bars i:nth-child(3) { height: 11px; }
+.bars i:nth-child(4) { height: 14px; }
+.bars i.on { background: var(--ink); }
+.lvlbtn .chev { width: 12px; height: 12px; color: var(--mute); transition: transform .3s var(--spring); }
+.lvlbtn.open .chev { transform: rotate(180deg); }
+.go { width: 38px; height: 38px; flex: none; border-radius: 50%; background: var(--ink); color: var(--paper);
+      display: grid; place-items: center; transition: transform .3s var(--spring), opacity .25s, background-color .3s; }
+.go:disabled { opacity: .18; cursor: default; }
+.go:not(:disabled):hover { transform: scale(1.06); }
+.go:not(:disabled):active { transform: scale(.9); }
+.go .ico { width: 16px; height: 16px; position: relative; }
+.go .arrow, .go .square { position: absolute; inset: 0; transition: transform .4s var(--spring), opacity .25s; }
+.go .square { transform: scale(.2) rotate(-90deg); opacity: 0; }
+.go .square i { position: absolute; inset: 2px; background: currentColor; border-radius: 3px; }
+.go.stop { background: var(--accent); color: var(--accent-ink); }
+.go.stop .arrow { transform: translateY(-14px); opacity: 0; }
+.go.stop .square { transform: none; opacity: 1; }
+.tchip { align-self: center; height: 26px; padding: 0 9px; border-radius: 8px; background: var(--sunk); font: 12px/26px var(--mono);
+         color: var(--ink-2); white-space: nowrap; max-width: 160px; overflow: hidden; text-overflow: ellipsis; flex: none; }
+
+/* ============ výběr úrovně myšlení ============ */
+#levels { position: fixed; z-index: 45; width: min(440px, calc(100vw - 24px)); background: var(--surface);
+          border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--pop); padding: 8px;
+          opacity: 0; transform: translateY(8px) scale(.98); transform-origin: bottom left; visibility: hidden;
+          transition: opacity .22s var(--out), transform .4s var(--spring), visibility .22s; }
+#levels.show { opacity: 1; transform: none; visibility: visible; }
+.lv-head { padding: 10px 12px 8px; }
+.lv-head b { font: 600 15px var(--display); display: block; }
+.lv-head small { font: 11.5px/1.5 var(--mono); color: var(--mute); display: block; margin-top: 3px; }
+.lv { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; column-gap: 12px; align-items: center;
+      padding: 11px 12px; border-radius: 12px; text-align: left; width: 100%; transition: background-color .15s; }
+.lv:hover { background: var(--sunk); }
+.lv .radio { width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid var(--line-2); display: grid; place-items: center;
+             transition: border-color .25s; }
+.lv .radio::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--ink); transform: scale(0);
+                    transition: transform .35s var(--spring); }
+.lv.sel .radio { border-color: var(--ink); }
+.lv.sel .radio::after { transform: scale(1); }
+.lv .nm { display: flex; align-items: baseline; gap: 8px; font-weight: 600; font-size: 14.5px; }
+.lv .nm small { font: 11px var(--mono); color: var(--mute); font-weight: 400; }
+.lv .ds { font-size: 12.5px; color: var(--mute); line-height: 1.4; margin-top: 1px; }
+.lv .sp { font: 11px/1.4 var(--mono); color: var(--ink-2); margin-top: 5px; display: flex; flex-wrap: wrap; gap: 4px 10px; }
+.fit { display: inline-flex; align-items: center; gap: 5px; }
+.fit::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--mute); }
+.fit.gpu::before { background: var(--ok); } .fit.mostly::before { background: var(--warn); }
+.fit.cpu::before, .fit.no::before { background: var(--bad); }
+.lv .act { display: flex; align-items: center; }
+.dl { height: 30px; padding: 0 11px; border-radius: 9px; background: var(--ink); color: var(--paper); font-size: 12.5px;
+      font-weight: 600; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+      transition: transform .25s var(--spring), background-color .15s; }
+.dl:hover { background: var(--ink-2); } .dl:active { transform: scale(.94); }
+.dl svg { width: 13px; height: 13px; }
+.prog { width: 120px; }
+.prog .pb { height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; }
+.prog .pb i { display: block; height: 100%; background: var(--ink); border-radius: 2px; transition: width .4s var(--out); }
+.prog .pt { font: 10.5px/1 var(--mono); color: var(--mute); margin-top: 6px; display: flex; justify-content: space-between; gap: 6px; }
+.prog .pt button { color: var(--mute); } .prog .pt button:hover { color: var(--bad); }
+.lv-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px 6px;
+           border-top: 1px solid var(--line); margin-top: 6px; font-size: 13px; }
+.lv-foot small { color: var(--mute); font-size: 12px; }
+
+/* ============ záložka Zařízení ============ */
+.rail { border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; background: var(--paper); }
+.rail-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 10px 6px 18px; }
+.rail-head b { font: 600 11px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--mute); }
+.devlist { padding: 2px 10px 10px; display: flex; flex-direction: column; gap: 4px; overflow-y: auto; min-height: 0; flex: 1; }
+.dev { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; column-gap: 10px; align-items: center; width: 100%;
+       padding: 9px 10px; border-radius: 12px; text-align: left; transition: background-color .15s; animation: enter .45s var(--out) both; }
+.dev:hover { background: var(--sunk); }
+.dev.sel { background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); }
+.dev .di { width: 34px; height: 34px; border-radius: 10px; background: var(--sunk); display: grid; place-items: center;
+           color: var(--ink-2); position: relative; }
+.dev.sel .di { background: var(--ink); color: var(--paper); }
+.dev .di svg { width: 18px; height: 18px; }
+.dev .di .dot { position: absolute; right: -2px; bottom: -2px; width: 10px; height: 10px; border: 2px solid var(--paper); }
+.dev.sel .di .dot { border-color: var(--surface); }
+.dev .dn { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dev .dsub { font-size: 12px; color: var(--mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.35; }
+.dev .dact { display: flex; gap: 2px; opacity: 0; transition: opacity .15s; }
+.dev:hover .dact, .dev.sel .dact { opacity: 1; }
+.dev .dact .mini { width: 28px; padding: 0; }
+.addcard { margin: 6px 10px 10px; padding: 14px; border: 1px dashed var(--line-2); border-radius: 14px; text-align: left;
+           width: calc(100% - 20px); display: flex; gap: 12px; align-items: center; transition: border-color .2s, background-color .2s; }
+.addcard:hover { border-color: var(--ink-2); background: var(--surface); }
+.addcard .plus { width: 34px; height: 34px; border-radius: 10px; background: var(--ink); color: var(--paper); display: grid;
+                 place-items: center; flex: none; }
+.addcard b { display: block; font-size: 14px; } .addcard small { color: var(--mute); font-size: 12px; line-height: 1.35; display: block; }
+.preview { border-top: 1px solid var(--line); padding: 12px; }
+.pv-head { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--mute); margin-bottom: 8px; }
+.pv-head b { color: var(--ink); font-weight: 600; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pv-img { aspect-ratio: 16 / 10; border-radius: 10px; background: var(--sunk); border: 1px solid var(--line); overflow: hidden;
+          display: grid; place-items: center; color: var(--mute); font-size: 12.5px; text-align: center; padding: 0; position: relative; }
+.pv-img img { width: 100%; height: 100%; object-fit: cover; cursor: zoom-in; animation: fade .35s both; }
+.pv-img .spinner { width: 22px; height: 22px; color: var(--mute); animation: spin .9s linear infinite; }
+.pv-img span { padding: 0 14px; }
+
+/* ============ průvodce párováním ============ */
+.modal { position: fixed; inset: 0; z-index: 55; display: grid; place-items: center; padding: 16px; visibility: hidden; }
+.modal .bg { position: absolute; inset: 0; background: rgba(20,18,15,.36); opacity: 0; transition: opacity .35s var(--out); }
+.modal .win { position: relative; width: min(520px, 100%); max-height: calc(100vh - 32px); overflow-y: auto;
+              background: var(--paper); border: 1px solid var(--line); border-radius: 22px; box-shadow: var(--pop);
+              padding: 26px 26px 22px; opacity: 0; transform: translateY(14px) scale(.97);
+              transition: opacity .3s var(--out), transform .5s var(--spring); }
+.modal.show { visibility: visible; }
+.modal.show .bg { opacity: 1; }
+.modal.show .win { opacity: 1; transform: none; }
+.modal .x { position: absolute; top: 12px; right: 12px; }
+.steps { display: flex; gap: 6px; margin: 8px 44px 22px 0; }
+.steps i { flex: 1; height: 3px; border-radius: 2px; background: var(--line); position: relative; overflow: hidden; }
+.steps i::after { content: ""; position: absolute; inset: 0; background: var(--ink); transform: scaleX(0); transform-origin: left;
+                  transition: transform .6s var(--out); }
+.steps i.on::after { transform: scaleX(1); }
+.wz h2 { font: 600 22px/1.2 var(--display); letter-spacing: -.02em; margin: 0 0 8px; }
+.wz p { color: var(--ink-2); margin: 0 0 16px; font-size: 14.5px; }
+.wz .step { animation: enter .5s var(--out) both; }
+.url { display: flex; align-items: center; gap: 6px; background: var(--surface); border: 1px solid var(--line-2); border-radius: 12px;
+       padding: 6px 6px 6px 14px; margin-bottom: 8px; }
+.url code { flex: 1; min-width: 0; font: 14px var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; user-select: all; }
+.wz ol { margin: 14px 0 16px; padding-left: 20px; color: var(--ink-2); font-size: 14px; }
+.wz li { margin: 5px 0; }
+.wait { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 12px; background: var(--sunk);
+        font-size: 13.5px; color: var(--ink-2); }
+.wait .spinner { width: 18px; height: 18px; animation: spin .9s linear infinite; color: var(--ink-2); }
+.code { font: 600 44px/1 var(--mono); letter-spacing: .14em; text-align: center; padding: 22px 0 18px; animation: pop .5s var(--spring) both; }
+.code span { color: var(--mute); }
+.field { display: block; margin: 4px 0 16px; }
+.field small { display: block; font-size: 12.5px; color: var(--mute); margin-bottom: 6px; }
+.field input { width: 100%; height: 40px; border: 1px solid var(--line-2); border-radius: 11px; background: var(--surface);
+               padding: 0 12px; outline: 0; transition: border-color .2s; }
+.field input:focus { border-color: var(--ink-2); }
+.acts { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
+.okmark { width: 64px; height: 64px; margin: 6px auto 14px; border-radius: 50%; background: var(--ok); color: #fff; display: grid;
+          place-items: center; animation: pop .55s var(--spring) both; }
+.okmark svg { width: 30px; height: 30px; stroke-dasharray: 30; stroke-dashoffset: 30; animation: draw .5s .25s var(--out) forwards; }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+.tiny { font-size: 12.5px; color: var(--mute); }
+
+/* ============ tlačítka, panel nastavení ============ */
+.btn { height: 36px; padding: 0 15px; border-radius: 11px; font-size: 13.5px; font-weight: 600; display: inline-flex;
+       align-items: center; justify-content: center; gap: 8px; transition: background-color .15s, transform .25s var(--spring), color .15s;
+       white-space: nowrap; flex: none; }
+.btn:active { transform: scale(.95); }
+.btn.solid { background: var(--ink); color: var(--paper); } .btn.solid:hover { background: var(--ink-2); }
+.btn.ghost { color: var(--ink-2); } .btn.ghost:hover { background: var(--sunk); color: var(--ink); }
+.btn.line { box-shadow: inset 0 0 0 1px var(--line-2); } .btn.line:hover { background: var(--surface); }
+.btn.danger { color: var(--bad); } .btn.danger:hover { background: var(--accent-soft); }
+.btn.sm { height: 30px; padding: 0 11px; font-size: 12.5px; border-radius: 9px; }
+.btn:disabled { opacity: .45; cursor: default; }
+.btn svg { width: 15px; height: 15px; }
+#scrim { position: fixed; inset: 0; background: rgba(20,18,15,.28); opacity: 0; visibility: hidden; z-index: 40;
+         transition: opacity .35s var(--out), visibility .35s; }
+#sheet { position: fixed; top: 0; right: 0; bottom: 0; width: min(420px, 100%); background: var(--paper);
+         border-left: 1px solid var(--line); z-index: 41; transform: translateX(104%); display: flex; flex-direction: column;
+         transition: transform .5s var(--out); box-shadow: -20px 0 50px -30px rgba(0,0,0,.35); }
+.sheet-open #scrim { opacity: 1; visibility: visible; }
+.sheet-open #sheet { transform: none; }
+.sheet-head { height: var(--head); display: flex; align-items: center; padding: 0 12px 0 22px; flex: none;
+              font: 600 15px var(--display); justify-content: space-between; }
+.electron-app .sheet-head { padding-right: 146px; -webkit-app-region: drag; }
+.electron-app .sheet-head button { -webkit-app-region: no-drag; }
+.sheet-body { overflow-y: auto; padding: 4px 22px 28px; flex: 1; }
+.sheet-open .sheet-body > * { animation: enter .55s var(--out) both; }
+.sheet-open .sheet-body > :nth-child(2) { animation-delay: .04s; } .sheet-open .sheet-body > :nth-child(3) { animation-delay: .08s; }
+.sheet-open .sheet-body > :nth-child(4) { animation-delay: .12s; } .sheet-open .sheet-body > :nth-child(5) { animation-delay: .16s; }
+.group { margin-top: 22px; }
+.group h3 { font: 600 11px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--mute); margin: 0 0 10px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.item { display: flex; align-items: center; gap: 14px; padding: 13px 16px; min-height: 58px; }
+.item + .item { border-top: 1px solid var(--line); }
+.item .t { flex: 1; min-width: 0; }
+.item .t b { display: block; font-weight: 600; font-size: 14.5px; line-height: 1.35; }
+.item .t small { display: block; color: var(--mute); font-size: 12.5px; line-height: 1.4; margin-top: 2px; overflow-wrap: break-word; }
+.item .t small code { font: 11.5px var(--mono); }
+.switch { width: 44px; height: 26px; border-radius: 26px; background: var(--line-2); position: relative; flex: none;
+          transition: background-color .3s var(--out); }
+.switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%;
+                 background: var(--surface); box-shadow: 0 1px 2px rgba(0,0,0,.2); transition: transform .45s var(--spring), width .2s var(--out); }
+.switch:active::after { width: 24px; }
+.switch.on { background: var(--ink); } .switch.on.hot { background: var(--accent); }
+.switch.on::after { transform: translateX(18px); }
+.switch.on:active::after { transform: translateX(14px); }
+.switch:disabled { opacity: .4; cursor: default; }
+.hw { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.hw div { padding: 12px 14px; } .hw div + div { border-left: 1px solid var(--line); }
+.hw small { display: block; font: 10.5px/1 var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--mute); }
+.hw b { display: block; margin-top: 6px; font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.foot { margin-top: 26px; font: 11.5px/1.7 var(--mono); color: var(--mute); }
+
+#lightbox { position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; padding: 32px; background: rgba(15,14,12,.78);
+            opacity: 0; visibility: hidden; transition: opacity .3s var(--out), visibility .3s; cursor: zoom-out; }
+#lightbox.show { opacity: 1; visibility: visible; }
+#lightbox img { max-width: 100%; max-height: 100%; border-radius: 12px; box-shadow: var(--pop); transform: scale(.94);
+                transition: transform .45s var(--spring); }
+#lightbox.show img { transform: none; }
+#toast { position: fixed; left: 50%; bottom: 96px; transform: translate(-50%, 16px); background: var(--ink);
+         color: var(--paper); padding: 9px 16px; border-radius: 12px; font-size: 13.5px; opacity: 0; z-index: 80;
+         pointer-events: none; transition: opacity .3s var(--out), transform .45s var(--spring); max-width: 90vw; text-align: center; }
+#toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+@media (max-width: 860px) {
+  #spaceDevices { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .rail { border-right: 0; border-bottom: 1px solid var(--line); max-height: 38vh; }
+  .preview { display: none; }
+}
+@media (max-width: 640px) {
+  .log { padding: 16px 16px 32px; } .composer { padding: 0 12px 12px; } .status { display: none; }
+  .msg { gap: 10px; } .tabs button { padding: 0 10px; } .lvlbtn .nm { display: none; } header { padding-left: 12px; }
+  .brand .nm2 { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001s !important; animation-iteration-count: 1 !important;
+                           transition-duration: .001s !important; }
+}
 </style>
 </head>
 <body>
-<div id="boot"><div class="boot-inner"><div class="orb"></div><div id="bootText">Spouštím Aiko…</div></div></div>
+<div id="boot"><div><div class="mark"></div><div id="bootText">Spouštím Jiříka</div></div></div>
 
 <div class="app">
-  <header>
-    <div class="brand" id="brand"><div class="mini-orb"></div>Aiko</div>
-    <span class="chip" id="modelChip" title="Model, který odpovídá"><span class="dot"></span><span id="modelText">model</span></span>
-    <span class="chip" id="pcChip" title="Ovládání tohoto počítače"><span class="dot"></span><span id="pcText">počítač</span></span>
-    <button class="chip" id="startAll" title="Spustí model (Ollama) a ovládání počítače, pokud neběží">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 3v8"/><path d="M6.3 7.2a8 8 0 1 0 11.4 0"/></svg>
-      <span>Spustit vše</span>
-    </button>
-    <button class="chip icon-btn" id="voiceBtn" title="Hlas Jirka – zapnout / vypnout">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4z"/><path id="waves" d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>
-    </button>
+  <header id="head">
+    <div class="brand" id="brand"><div class="mark"></div><span class="nm2">Jiřík</span><span class="badge hidden" id="badge">bez cenzury</span></div>
+    <nav class="tabs" id="tabs">
+      <span class="ind" id="tabInd"></span>
+      <button data-tab="chat" class="on" title="Chat (Ctrl+1)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>Chat</button>
+      <button data-tab="devices" title="Zařízení (Ctrl+2)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="14" height="10" rx="2"/><path d="M6 18h6M9 14v4"/><rect x="17" y="8" width="5" height="10" rx="1.5"/></svg>Zařízení<span class="cnt" id="devCount" hidden>0</span></button>
+    </nav>
+    <div class="right">
+      <div class="status" id="status"><span class="dot" id="sdot"></span><span class="txt" id="stext">…</span></div>
+      <div class="sep"></div>
+      <button class="iconbtn" id="voiceBtn" title="Hlas (zapnout / vypnout)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M11 5 6 9H3v6h3l5 4z"/><path class="waves" d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/><path class="slash" d="M3 3l18 18"/></svg>
+      </button>
+      <button class="iconbtn" id="newBtn" title="Nový chat (Ctrl+N)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+      </button>
+      <button class="iconbtn" id="setBtn" title="Nastavení">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
+      </button>
+    </div>
   </header>
 
-  <div id="log"></div>
-
-  <div class="composer">
-    <form class="box" id="form">
-      <textarea id="text" rows="1" placeholder="Napište, s čím pomoci, nebo se na cokoli zeptejte…" autocomplete="off"></textarea>
-      <button class="stop" type="button" id="stop" title="Zastavit">
-        <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
-      </button>
-      <button class="send" type="submit" id="send" title="Odeslat (Enter)" disabled>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
-      </button>
-    </form>
-    <div class="hint">Enter = odeslat · Shift+Enter = nový řádek · Aiko se před každou změnou zeptá</div>
-  </div>
+  <main>
+    <section class="space" id="spaceChat"></section>
+    <section class="space off" id="spaceDevices" style="--dir: 14px">
+      <aside class="rail">
+        <div class="rail-head"><b>Zařízení</b>
+          <button class="iconbtn" id="addDev" title="Přidat zařízení"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+        </div>
+        <div class="devlist" id="devList"></div>
+        <div class="preview" id="preview">
+          <div class="pv-head"><b id="pvName">Obrazovka</b>
+            <button class="mini" id="pvRefresh" title="Obnovit náhled"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4L21 8"/><path d="M21 3v5h-5"/></svg></button>
+          </div>
+          <div class="pv-img" id="pvImg"><span>Náhled obrazovky vybraného zařízení</span></div>
+        </div>
+      </aside>
+      <div class="chatcol" id="devicesChat"></div>
+    </section>
+  </main>
 </div>
 
+<div id="levels" role="dialog" aria-label="Úroveň myšlení"></div>
+
+<div class="modal" id="wizard"><div class="bg"></div><div class="win">
+  <button class="iconbtn x" id="wzClose" title="Zavřít"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+  <div class="steps"><i></i><i></i><i></i></div>
+  <div class="wz" id="wzBody"></div>
+</div></div>
+
+<div id="scrim"></div>
+<aside id="sheet" aria-label="Nastavení">
+  <div class="sheet-head">Nastavení
+    <button class="iconbtn" id="closeSheet" title="Zavřít"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+  </div>
+  <div class="sheet-body">
+    <div class="group"><h3>Tento počítač</h3><div class="card hw" id="hwCard"></div></div>
+    <div class="group">
+      <h3>Model</h3>
+      <div class="card">
+        <div class="item"><div class="t"><b>Úroveň myšlení</b><small id="lvlInfo">…</small></div>
+          <button class="btn line sm" id="lvlOpen">Změnit</button></div>
+        <div class="item"><div class="t"><b>Necenzurovaný režim</b><small id="modelInfo">…</small></div>
+          <button class="switch hot" id="swUnc" role="switch" aria-checked="false"></button></div>
+      </div>
+    </div>
+    <div class="group"><h3>Stažené modely</h3><div class="card" id="modelList"></div></div>
+    <div class="group">
+      <h3>Hlas</h3>
+      <div class="card"><div class="item"><div class="t"><b>Číst odpovědi nahlas</b><small id="voiceInfo">Hlas Jirka · běží na tomto počítači</small></div>
+        <button class="switch" id="swVoice" role="switch" aria-checked="true"></button></div></div>
+    </div>
+    <div class="group">
+      <h3>Konverzace</h3>
+      <div class="card"><div class="item"><div class="t"><b>Smazat historii</b><small id="wipeInfo">Odstraní chat v této záložce.</small></div>
+        <button class="btn danger sm" id="wipe">Smazat</button></div></div>
+    </div>
+    <div class="foot">Vše běží místně · chat jen na 127.0.0.1<br>Enter odeslat · Shift+Enter nový řádek · Esc zastavit<br>Ctrl+1 Chat · Ctrl+2 Zařízení · Ctrl+N nový chat</div>
+  </div>
+</aside>
+<div id="lightbox"><img alt=""></div>
+<div id="toast"></div>
+
 <script>
+"use strict";
 const $ = id => document.getElementById(id);
-const log = $("log");
-const IDEAS = [
-  ["Zeptat se", "Kdo byl Karel Čapek?"],
-  ["Pustit video", "Otevři YouTube a pusť písničku od Karla Gotta"],
-  ["Zahrát si", "Zahraj si hledání min"],
-  ["Uklidit", "Vytvoř na ploše složku Fotky"],
-  ["Počasí", "Jaké je dnes počasí v Praze?"],
-  ["Kontrola", "Počítač je pomalý, zjisti proč"],
-];
-const scrollDown = () => requestAnimationFrame(() => { log.scrollTop = log.scrollHeight; });
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const S = { settings: { voice: true, uncensored: false, level: "low" }, status: {}, models: { hardware: {}, levels: [], pulls: {} },
+            devices: [], nodes: [], pairing: null, voiceAvail: true, connected: false, booted: false, userName: "",
+            speaking: null, tab: "chat", target: "local", pendingSelect: null };
+const LVL_IDX = { low: 1, medium: 2, smart: 3, ultra: 4 };
 
-// ---------- zprávy ----------
-let hello = null, typing = null, typingTimer = null, quick = null, busy = 0;
-function showHello() {
-  hello = document.createElement("div");
-  hello.className = "hello";
-  hello.innerHTML = `<div class="orb"></div><h2>Dobrý den, s čím pomůžu?</h2>
-    <p>Odpovím na otázku nebo něco udělám na tomto počítači – vždy se nejdřív zeptám.</p><div class="ideas"></div>`;
-  IDEAS.forEach(([t, s]) => {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.innerHTML = `<b></b><span></span>`;
-    b.querySelector("b").textContent = t; b.querySelector("span").textContent = s;
-    b.onclick = () => send(s);
-    hello.querySelector(".ideas").append(b);
-  });
-  log.append(hello);
-}
-function hideHello() { if (hello) { hello.remove(); hello = null; } }
-function row(cls) { const r = document.createElement("div"); r.className = "row " + cls; log.append(r); return r; }
-function addMe(text) { hideHello(); const b = document.createElement("div"); b.className = "bubble"; b.textContent = text;
-                       row("me").append(b); scrollDown(); }
-function addAiko(text, guide) {
-  hideHello();
-  const b = document.createElement("div");
-  b.className = "bubble";
-  b.textContent = text;
-  if (guide && guide.length) {
-    const ol = document.createElement("ol");
-    guide.forEach(g => { const li = document.createElement("li"); li.textContent = g; ol.append(li); });
-    b.append(ol);
-  }
-  const r = row("aiko");
-  if (typing) log.insertBefore(r, typing);                 // ukazatel „pracuji“ zůstává dole
-  r.append(b);
-  scrollDown();
-  return b;
-}
-function note(text, err) { const n = document.createElement("div"); n.className = "note" + (err ? " err" : "");
-                           n.textContent = text; log.append(n); scrollDown(); }
+const MARK = `<svg viewBox="0 0 32 32" aria-hidden="true"><g class="hd">
+<circle class="ear" cx="4.3" cy="19.6" r="2.3"/><circle class="ear" cx="27.7" cy="19.6" r="2.3"/>
+<circle class="face" cx="16" cy="18" r="12.2"/>
+<path class="cap" d="M4.1 14.3C4.4 8.7 9.1 5.3 16.2 5.3c6.9 0 11.6 3.1 11.8 8.6 1.5.4 2.1 1.4 1.4 2.3-8.1-1.6-18.6-1.6-26.7.2-.7-.9-.2-1.8 1.4-2.1Z"/><path class="seam" d="M5.6 13.4c5.6-1.9 15.2-1.9 20.8-.2"/>
+<path class="brows" d="M8.2 17.3c1.2-1.6 3.7-2 6-1 .3.2.2.6-.1.6-1.9-.3-3.8 0-5.5.8-.3.1-.5-.2-.4-.4ZM23.8 17.3c-1.2-1.6-3.7-2-6-1-.3.2-.2.6.1.6 1.9-.3 3.8 0 5.5.8.3.1.5-.2.4-.4Z"/>
+<g class="eyes"><circle cx="11.7" cy="19.7" r="1"/><circle cx="20.3" cy="19.7" r="1"/></g>
+<g class="specs"><circle cx="11.7" cy="19.7" r="3.1"/><circle cx="20.3" cy="19.7" r="3.1"/><path d="M14.8 19.5q1.2-.9 2.4 0"/></g>
+<path class="stache" d="M16 23.3c-1.4-1.2-3.6-1.3-5.2-.2-1 .7-2 1-3 .8 1.1 2.2 3.8 2.8 5.8 1.8 1-.5 1.8-1 2.4-1.5.6.5 1.4 1 2.4 1.5 2 1 4.7.4 5.8-1.8-1 .2-2-.1-3-.8-1.6-1.1-3.8-1-5.2.2Z"/></g></svg>`;
+const markHTML = `<div class="mark">${MARK}</div>`;
+document.querySelectorAll(".mark:empty").forEach(m => (m.innerHTML = MARK));
 
-function setBusy(on, status) {
-  busy = Math.max(0, busy + (on ? 1 : -1));
-  const active = busy > 0;
-  $("brand").classList.toggle("busy", active);
-  $("stop").classList.toggle("on", active);
-  if (active && !typing) {
-    typing = row("aiko typing");
-    typing.innerHTML = `<div class="bubble"><span class="dots"><i></i><i></i><i></i></span>
-                        <span class="status">Přemýšlím…</span><span class="secs"></span></div>`;
-    const t0 = Date.now();
-    typingTimer = setInterval(() => {
-      const s = Math.round((Date.now() - t0) / 1000);
-      if (typing) typing.querySelector(".secs").textContent = s >= 3 ? s + " s" : "";
-    }, 500);
-    scrollDown();
-  }
-  if (active && status) progress(status);
-  if (!active && typing) { typing.remove(); typing = null; clearInterval(typingTimer); }
-}
-function progress(text) {
-  if (!typing || !text) return;
-  const s = typing.querySelector(".status");
-  s.style.opacity = 0;
-  setTimeout(() => { s.textContent = text; s.style.opacity = 1; }, 120);
-}
-function clearQuick() { if (quick) { quick.remove(); quick = null; } }
-function askYesNo() {
-  clearQuick();
-  quick = document.createElement("div");
-  quick.className = "quick";
-  ["Ano", "Ne"].forEach(t => { const b = document.createElement("button"); b.type = "button"; b.textContent = t;
-                               b.onclick = () => send(t); quick.append(b); });
-  row("aiko").append(quick);
-  quick = quick.parentElement;
-  scrollDown();
-}
+const I = {
+  copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2.5"/><path d="M5 15V6a2 2 0 0 1 2-2h8"/></svg>',
+  check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7"/></svg>',
+  x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+  run: '<svg class="spin" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-dasharray="24 14"/></svg>',
+  done: '<svg class="ok" viewBox="0 0 16 16"><circle cx="8" cy="8" r="7.5" fill="currentColor"/><path d="M4.8 8.3 7 10.4l4.3-4.6" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  fail: '<svg class="no" viewBox="0 0 16 16"><circle cx="8" cy="8" r="7.5" fill="currentColor"/><path d="M8 4.4v4.4" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/><circle cx="8" cy="11.4" r="1.05" fill="#fff"/></svg>',
+  stop: '<svg class="st" viewBox="0 0 16 16"><rect x="3" y="3" width="10" height="10" rx="2.5" fill="currentColor"/></svg>',
+  spark: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/></svg>',
+  chev: '<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>',
+  down: '<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg>',
+  dl: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>',
+  pc: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>',
+  power: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v8"/><path d="M6.3 7.2a8 8 0 1 0 11.4 0"/></svg>',
+  trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>',
+  edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
+  spinner: '<svg class="spinner" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-dasharray="40 18"/></svg>',
+  clip: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.5 12.6 21a5.5 5.5 0 0 1-7.8-7.8l8.5-8.5a3.7 3.7 0 0 1 5.2 5.2l-8.5 8.5a1.8 1.8 0 0 1-2.6-2.6l7.8-7.8"/></svg>',
+};
 
-// ---------- odpovědi: každá jen jednou (HTTP i WebSocket nesou tutéž) ----------
-const seenReplies = new Set();
-const recentSay = new Map();
-function onReply(r, viaWs) {
-  if (!r || !r.say) return;
-  const key = r.ts + "|" + r.say;
-  if (seenReplies.has(key)) return;
-  seenReplies.add(key);
-  if (r.screen === "pracuje") {                       // průběžný stav – do ukazatele, ne do historie
-    progress(r.say);
-    voice.say(r.say, "progress");
-    return;
-  }
-  clearQuick();
-  const b = addAiko(r.say, r.guide);
-  voice.say(r.say, "final", b);
-  (r.guide || []).forEach((g, i) => voice.say(`Krok ${i + 1}. ${g}`, "final", b));
-  if (r.expects_answer) askYesNo();
-}
-function onSay(text) {
-  if (!text) return;
-  const now = Date.now();
-  if (now - (recentSay.get(text) || 0) < 15000) return;
-  recentSay.set(text, now);
-  if (busy) { progress(text); voice.say(text, "progress"); }
-  else { addAiko(text); voice.say(text, "final"); }
-}
-
-// ---------- hlas Jirka: jedna fronta, nic se nepřekrývá ani neopakuje ----------
-const voice = (() => {
-  let on = localStorage.getItem("aiko.voice") !== "off";
-  let gen = 0;                 // každé „ztiš“ zneplatní vše, co se ještě načítá
-  let queue = [];              // {text, kind, el, url: Promise<string|null>}
-  let current = null;          // {audio, item}
-  const audio = new Audio();
-  audio.preload = "auto";
-
-  function split(text) {       // po větách: první věta zazní dřív, další se mezitím připraví
-    const parts = text.replace(/\s+/g, " ").match(/[^.!?…]+[.!?…]+["“”»]?|[^.!?…]+$/g) || [text];
-    const out = [];
-    for (const p of parts.map(s => s.trim()).filter(Boolean)) {
-      if (out.length && (out[out.length - 1].length < 28 || p.length < 12)) out[out.length - 1] += " " + p;
-      else out.push(p);
-    }
-    return out;
-  }
-  function fetchUrl(text, g) {
-    return fetch("/api/tts?text=" + encodeURIComponent(text.slice(0, 480)))
-      .then(r => r.ok ? r.blob() : null)
-      .then(b => (b && g === gen) ? URL.createObjectURL(b) : null)
-      .catch(() => null);
-  }
-  function say(text, kind, el) {
-    if (!on || !text) return;
-    if (kind === "final") queue = queue.filter(q => q.kind !== "progress");     // stará hláška o průběhu už nepatří
-    else queue = queue.filter(q => q.kind !== "progress");                       // jen poslední průběh
-    if (kind === "progress" && current && current.item.kind === "progress") return;
-    const g = gen;
-    split(text).forEach(t => queue.push({ text: t, kind, el, g, url: fetchUrl(t, g) }));
-    if (!current) next();
-  }
-  async function next() {
-    const item = queue.shift();
-    if (!item) { current = null; return; }
-    current = { item };
-    if (item.el) item.el.classList.add("speaking");
-    const url = await item.url;
-    if (item.g !== gen) return;                         // mezitím ztišeno
-    let finished = false;
-    const done = () => {
-      if (finished) return;                               // onended i onerror zavolají jen jednou
-      finished = true;
-      if (url) URL.revokeObjectURL(url);
-      if (item.el && !queue.some(q => q.el === item.el)) item.el.classList.remove("speaking");
-      if (item.g === gen) next();
-    };
-    if (!url) { fallback(item.text, done); return; }
-    audio.onended = done;
-    audio.onerror = done;
-    audio.src = url;
-    audio.play().catch(done);
-  }
-  function fallback(text, done) {                       // hlas prohlížeče, jen když Jirka není k dispozici
-    if (!("speechSynthesis" in window)) return done();
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = "cs-CZ"; u.rate = 0.95;
-    u.onend = done; u.onerror = done;
-    speechSynthesis.speak(u);
-  }
-  function hush() {
-    gen++;
-    queue = [];
-    audio.onended = audio.onerror = null;
-    audio.pause(); audio.removeAttribute("src");
-    if ("speechSynthesis" in window) speechSynthesis.cancel();
-    document.querySelectorAll(".speaking").forEach(e => e.classList.remove("speaking"));
-    current = null;
-  }
-  function toggle() { on = !on; localStorage.setItem("aiko.voice", on ? "on" : "off"); if (!on) hush(); render(); }
-  function render() { $("voiceBtn").classList.toggle("off", !on); $("waves").style.display = on ? "" : "none"; }
-  render();
-  return { say, hush, toggle };
-})();
-
-// ---------- odesílání ----------
-async function post(path, body) {
-  const r = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
+async function api(path, body, method = "POST") {
+  const r = await fetch(path, method === "GET" ? {} : { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
   if (!r.ok) throw new Error("HTTP " + r.status);
   return r.json();
 }
-async function send(text) {
-  text = (text || "").trim();
-  if (!text) return;
-  voice.hush(); clearQuick();
-  addMe(text);
-  setBusy(true, "Přemýšlím…");
-  try { onReply(await post("/api/utterance", { text, source: "chat" })); }
-  catch (e) { note("Server neodpověděl – běží okno „Start Aiko“?", true); }
-  finally { setBusy(false); }
-}
-const ta = $("text");
-function autosize() { ta.style.height = "auto"; ta.style.height = Math.min(ta.scrollHeight, 160) + "px";
-                      ta.classList.toggle("scroll", ta.scrollHeight > 160);
-                      $("send").disabled = !ta.value.trim(); }
-ta.addEventListener("input", autosize);
-window.addEventListener("resize", autosize);
-autosize();
-ta.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); $("form").requestSubmit(); } });
-$("form").onsubmit = e => { e.preventDefault(); const t = ta.value; ta.value = ""; autosize(); send(t); ta.focus(); };
-$("stop").onclick = async () => { voice.hush(); try { onReply(await post("/api/stop")); } catch (e) {} };
-$("voiceBtn").onclick = () => voice.toggle();
-document.addEventListener("keydown", e => { if (e.key === "Escape") voice.hush(); });
+let toastT;
+function toast(text) { const t = $("toast"); t.textContent = text; t.classList.add("show"); clearTimeout(toastT);
+                       toastT = setTimeout(() => t.classList.remove("show"), 2800); }
+function lightbox(src) { const l = $("lightbox"); l.querySelector("img").src = src; l.classList.add("show"); }
+$("lightbox").onclick = () => $("lightbox").classList.remove("show");
+const fmtGB = b => (b / 1073741824).toFixed(b > 10737418240 ? 0 : 1).replace(".", ",") + " GB";
+const num = n => String(n).replace(".", ",");
 
-// ---------- stav: model, počítač, „Spustit vše“ ----------
-function setChip(id, state, text) { const c = $(id); c.className = "chip " + state; c.querySelector("span:last-child").textContent = text; }
-function devices(devs) {
-  const pc = (devs || []).find(d => d.kind === "pc" && d.online);
-  setChip("pcChip", pc ? "ok" : "", pc ? "počítač připojen" : "počítač nepřipojen");
+// ---------- markdown (bezpečně: nejdřív escape) ----------
+function inline(s) {
+  const codes = [];
+  s = s.replace(/`([^`\n]+)`/g, (_, c) => { codes.push(c); return "\u0000" + (codes.length - 1) + "\u0000"; });
+  s = esc(s)
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
+    .replace(/(^|[\s(])(https?:\/\/[^\s<)]+[^\s<).,;:!?])/g, '$1<a href="$2" target="_blank" rel="noopener">$2</a>')
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>").replace(/__([^_]+)__/g, "<strong>$1</strong>")
+    .replace(/(^|[^*\w])\*([^*\n]+)\*(?!\w)/g, "$1<em>$2</em>").replace(/~~([^~]+)~~/g, "<del>$1</del>");
+  return s.replace(/\u0000(\d+)\u0000/g, (_, i) => "<code>" + esc(codes[i]) + "</code>");
 }
-async function refreshState() {
-  try {
-    const st = await (await fetch("/api/state")).json();
-    devices(st.devices);
-    const llm = st.llm || "", local = /ollama/i.test(llm);
-    setChip("modelChip", local ? "ok" : "wait", local ? (st.vlm || llm).replace(/^ollama:/, "") : "model neběží");
-    return st;
-  } catch (e) { return null; }
-}
-$("startAll").onclick = async () => {
-  const b = $("startAll"), label = b.querySelector("span");
-  b.disabled = true; label.innerHTML = '<span class="spin"></span>';
-  try {
-    const r = await post("/api/local/start");
-    note(r.say);
-    for (let i = 0; i < 20 && r.started.length; i++) {            // počkat, až se rozjede
-      await new Promise(res => setTimeout(res, 1500));
-      const st = await refreshState();
-      if (st && (st.devices || []).some(d => d.kind === "pc" && d.online) && /ollama/i.test(st.llm || "")) break;
+function md(src) {
+  const out = []; const lines = src.replace(/\r/g, "").split("\n");
+  let i = 0, para = [];
+  const flush = () => { if (para.length) { out.push("<p>" + inline(para.join("\n")).replace(/\n/g, "<br>") + "</p>"); para = []; } };
+  while (i < lines.length) {
+    const l = lines[i];
+    const fence = l.match(/^\s*```\s*([\w+#.-]*)/);
+    if (fence) {
+      flush(); const buf = []; i++;
+      while (i < lines.length && !/^\s*```/.test(lines[i])) buf.push(lines[i++]);
+      i++;
+      out.push(`<pre>${fence[1] ? `<span class="lang">${esc(fence[1])}</span>` : ""}<button class="mini copy" title="Kopírovat">${I.copy}</button><code>${esc(buf.join("\n"))}</code></pre>`);
+      continue;
     }
-  } catch (e) { note("Server neběží – spusťte „Start Aiko.bat“ ve složce Aiko-Local.", true); }
-  b.disabled = false; label.textContent = "Spustit vše";
-};
+    if (/^\s*$/.test(l)) { flush(); i++; continue; }
+    const h = l.match(/^(#{1,3})\s+(.*)/);
+    if (h) { flush(); out.push(`<h${h[1].length}>${inline(h[2])}</h${h[1].length}>`); i++; continue; }
+    if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(l)) { flush(); out.push("<hr>"); i++; continue; }
+    if (/^\s*>/.test(l)) { flush(); const b = []; while (i < lines.length && /^\s*>/.test(lines[i])) b.push(lines[i++].replace(/^\s*>\s?/, ""));
+                           out.push("<blockquote>" + md(b.join("\n")) + "</blockquote>"); continue; }
+    if (/^\s*\|.*\|\s*$/.test(l) && i + 1 < lines.length && /^\s*\|?\s*:?-+/.test(lines[i + 1])) {
+      flush(); const row = r => r.trim().replace(/^\||\|$/g, "").split("|").map(c => inline(c.trim()));
+      const head = row(l); i += 2; const body = [];
+      while (i < lines.length && /^\s*\|/.test(lines[i])) body.push(row(lines[i++]));
+      out.push('<div class="tbl"><table><tr>' + head.map(c => `<th>${c}</th>`).join("") + "</tr>" +
+               body.map(r => "<tr>" + r.map(c => `<td>${c}</td>`).join("") + "</tr>").join("") + "</table></div>");
+      continue;
+    }
+    const li = l.match(/^\s*([-*•]|\d+[.)])\s+(.*)/);
+    if (li) {
+      flush(); const ordered = /\d/.test(li[1]); const items = [];
+      while (i < lines.length) {
+        const m = lines[i].match(/^\s*([-*•]|\d+[.)])\s+(.*)/);
+        if (m) { items.push(m[2]); i++; }
+        else if (/^\s{2,}\S/.test(lines[i]) && items.length) { items[items.length - 1] += " " + lines[i].trim(); i++; }
+        else break;
+      }
+      out.push(`<${ordered ? "ol" : "ul"}>` + items.map(t => "<li>" + inline(t) + "</li>").join("") + `</${ordered ? "ol" : "ul"}>`);
+      continue;
+    }
+    para.push(l); i++;
+  }
+  flush();
+  return out.join("");
+}
 
-let booted = false;
+// ---------- jedna konverzace (prostor) ----------
+const COMPOSER = `<div class="scroller"><div class="log"></div><button class="down" title="Dolů"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg></button></div>
+<div class="composer"><form class="box"><div class="attach"></div><div class="row">
+  <button type="button" class="iconbtn clip" title="Přidat obrázek">${I.clip}</button><input type="file" accept="image/*" multiple hidden>
+  <span class="tchip" hidden></span>
+  <textarea rows="1" autocomplete="off" spellcheck="true"></textarea>
+  <button type="button" class="lvlbtn" title="Úroveň myšlení"><span class="bars"><i></i><i></i><i></i><i></i></span><span class="nm">Nízká</span>${I.down}</button>
+  <button type="submit" class="go" disabled title="Odeslat"><span class="ico"><svg class="arrow" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5"/></svg><span class="square"><i></i></span></span></button>
+</div></form></div>`;
+
+class View {
+  constructor(space, root) {
+    this.space = space; root.innerHTML = COMPOSER; this.root = root;
+    const q = s => root.querySelector(s);
+    this.log = q(".log"); this.scroller = q(".scroller"); this.ta = q("textarea"); this.go = q(".go");
+    this.form = q("form"); this.attachEl = q(".attach"); this.lvlbtn = q(".lvlbtn"); this.tchip = q(".tchip");
+    this.messages = new Map(); this.order = []; this.live = null; this.attach = []; this.previews = [];
+    this.stick = true; this.dirty = new Set(); this.raf = 0;
+    this.ta.placeholder = space === "chat" ? "Napiš zprávu…" : "Co mám udělat na zařízení?";
+    this.scroller.addEventListener("scroll", () => {
+      this.stick = this.scroller.scrollHeight - this.scroller.scrollTop - this.scroller.clientHeight < 80;
+      q(".down").classList.toggle("show", !this.stick);
+      if (S.tab === space) $("head").classList.toggle("scrolled", this.scroller.scrollTop > 4);
+    }, { passive: true });
+    q(".down").onclick = () => { this.stick = true; this.scroller.scrollTo({ top: this.scroller.scrollHeight, behavior: "smooth" }); };
+    this.ta.addEventListener("input", () => this.autosize());
+    this.ta.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); this.form.requestSubmit(); } });
+    this.ta.addEventListener("paste", e => { for (const it of e.clipboardData.items) if (it.type.startsWith("image/")) { this.addImage(it.getAsFile()); e.preventDefault(); } });
+    this.form.onsubmit = e => { e.preventDefault(); this.submit(); };
+    q(".clip").onclick = () => q("input[type=file]").click();
+    q("input[type=file]").onchange = e => { [...e.target.files].forEach(f => this.addImage(f)); e.target.value = ""; };
+    ["dragenter", "dragover"].forEach(t => this.form.addEventListener(t, e => { e.preventDefault(); this.form.classList.add("drag"); }));
+    ["dragleave", "drop"].forEach(t => this.form.addEventListener(t, e => { e.preventDefault(); this.form.classList.remove("drag"); }));
+    this.form.addEventListener("drop", e => [...e.dataTransfer.files].filter(f => f.type.startsWith("image/")).forEach(f => this.addImage(f)));
+    this.attachEl.onclick = e => { const b = e.target.closest("button"); if (b) { this.attach.splice(+b.dataset.i, 1); this.renderAttach(); this.setGo(); } };
+    this.lvlbtn.onclick = () => levelsPop(this.lvlbtn);
+    this.log.addEventListener("click", e => this.onClick(e));
+    this.autosize();
+  }
+  autosize() { const t = this.ta; t.style.height = "38px"; t.style.height = Math.min(t.scrollHeight, 220) + "px"; this.setGo(); }
+  setGo() {
+    const busy = !!this.live, has = this.ta.value.trim() || this.attach.length;
+    this.go.classList.toggle("stop", busy && !has); this.go.disabled = !busy && !has;
+    this.go.title = busy && !has ? "Zastavit (Esc)" : "Odeslat (Enter)";
+  }
+  async submit() {
+    const text = this.ta.value.trim();
+    if (!text && !this.attach.length) { if (this.live) api("/api/stop", { space: this.space }).catch(() => {}); return; }
+    const imgs = this.attach.splice(0); this.previews = imgs.slice();
+    this.ta.value = ""; this.renderAttach(); this.autosize(); this.stick = true;
+    const target = this.space === "devices" ? targetName() : "";
+    try { await api("/api/chat", { text, images: imgs, space: this.space, target }); }
+    catch { toast("Jiřík neodpovídá – běží server?"); this.ta.value = text; this.autosize(); }
+  }
+  addImage(file) {
+    if (!file || this.attach.length >= 4) return;
+    const img = new Image(), url = URL.createObjectURL(file);
+    img.onload = () => {
+      const k = Math.min(1, 1280 / Math.max(img.width, img.height));
+      const c = document.createElement("canvas"); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      this.attach.push(c.toDataURL("image/jpeg", .86)); URL.revokeObjectURL(url); this.renderAttach(); this.setGo(); this.ta.focus();
+    };
+    img.src = url;
+  }
+  renderAttach() {
+    this.attachEl.innerHTML = this.attach.map((d, i) => `<div class="att"><img src="${d}" alt=""><button type="button" data-i="${i}" title="Odebrat">${I.x}</button></div>`).join("");
+  }
+  follow() { if (this.stick) requestAnimationFrame(() => (this.scroller.scrollTop = this.scroller.scrollHeight)); }
+  el(id) { return this.log.querySelector(`[data-id="${id}"]`); }
+  hello() {
+    if (this.order.length) return;
+    if (this.space === "chat") {
+      const n = S.userName ? `Ahoj, ${esc(S.userName)}.` : "Ahoj.";
+      this.log.innerHTML = `<div class="hello">${markHTML}<h1>${n}<span>Co pro tebe můžu udělat?</span></h1></div>`;
+    } else {
+      this.log.innerHTML = `<div class="hello">${markHTML}<h1>Všechna zařízení.<span>Vyber počítač a napiš, co na něm udělat.</span></h1></div>`;
+    }
+  }
+  reset(msgs, current) {
+    this.messages.clear(); this.order = []; this.log.innerHTML = ""; this.live = current ? current.id : null;
+    for (const m of msgs || []) this.add(m);
+    this.hello(); this.setGo();
+    requestAnimationFrame(() => (this.scroller.scrollTop = this.scroller.scrollHeight));
+  }
+  add(m) {
+    if (this.messages.has(m.id)) { Object.assign(this.messages.get(m.id), m); if (m.role === "assistant") this.schedule(m.id); return; }
+    if (!this.order.length) this.log.innerHTML = "";
+    this.messages.set(m.id, m); this.order.push(m.id);
+    if (m.role === "user") this.log.append(this.renderUser(m, m.images && this.previews.length ? this.previews.splice(0) : null));
+    else this.paint(m);
+    this.follow();
+  }
+  renderUser(m, previews) {
+    const a = document.createElement("article"); a.className = "msg me"; a.dataset.id = m.id;
+    let thumbs = "";
+    if (previews && previews.length) thumbs = `<div class="thumbs">${previews.map(p => `<img src="${p}" alt="">`).join("")}</div>`;
+    else if (m.images) thumbs = `<div class="thumbs"><span class="count">${m.images}× obrázek</span></div>`;
+    const tgt = m.target ? `<div class="tgt">→ ${esc(m.target)}</div>` : "";
+    a.innerHTML = `<div class="col">${thumbs}${m.text ? `<div class="bubble">${esc(m.text)}</div>` : ""}${tgt}</div>`;
+    return a;
+  }
+  schedule(id) {
+    this.dirty.add(id);
+    if (!this.raf) this.raf = requestAnimationFrame(() => {
+      this.raf = 0;
+      for (const d of this.dirty) { const m = this.messages.get(d); if (m) this.paint(m); }
+      this.dirty.clear(); this.follow();
+    });
+  }
+  paint(m) {
+    let a = this.el(m.id);
+    if (!a) {
+      a = document.createElement("article"); a.className = "msg aiko"; a.dataset.id = m.id;
+      a.innerHTML = `<div class="who">${markHTML}</div><div class="body"><div class="note-slot"></div><div class="reason-slot"></div>
+        <div class="tools"></div><div class="md"></div><div class="tail"></div>
+        <div class="meta"><span class="lvl"></span><button class="mini speak-stop" title="Ztišit"><span class="eq"><i></i><i></i><i></i><i></i></span></button>
+        <button class="mini copy-msg" title="Kopírovat odpověď">${I.copy}</button></div></div>`;
+      this.log.append(a);
+    }
+    const live = this.live === m.id;
+    a.classList.toggle("live", live);
+    a.classList.toggle("thinking", live && !!m._thinkNow);
+    set(a.querySelector(".note-slot"), m.note ? `<div class="notice">${esc(m.note)}</div>` : "");
+    this.paintReason(a, m, live);
+    this.paintTools(a, m);
+    const running = (m.tools || []).some(t => t.state === "run");
+    let html = m.text ? md(m.text) : "";
+    if (live && !m.text && !running && !m._thinkNow) html = '<span class="think"><i></i><i></i><i></i></span>';
+    else if (live && m.text && !running) {
+      const k = html.lastIndexOf("</");
+      if (k > 0 && /^<\/(p|li|h\d|td)>/.test(html.slice(k))) html = html.slice(0, k) + '<span class="caret"></span>' + html.slice(k);
+    }
+    set(a.querySelector(".md"), html);
+    const t = m.error ? `<div class="err">${esc(m.error)}</div>` : m.stopped ? `<div class="stopped">— zastaveno</div>` : "";
+    set(a.querySelector(".tail"), t);
+    const lv = S.models.levels.find(l => l.key === m.level);
+    set(a.querySelector(".lvl"), lv && !live ? esc(lv.name) : "");
+    a.classList.toggle("speaking", S.speaking === m.id);
+    a.querySelector(".meta").classList.toggle("has-speech", S.speaking === m.id);
+  }
+  paintReason(a, m, live) {
+    const slot = a.querySelector(".reason-slot");
+    if (!m.thinking) { set(slot, ""); return; }
+    let r = slot.firstElementChild;
+    if (!r) {
+      slot.innerHTML = `<div class="reason"><button class="rh">${I.spark}<span class="lbl"></span>${I.chev}</button><div class="rb"><div><div class="rt"></div></div></div></div>`;
+      r = slot.firstElementChild; r._open = !!(live && m._thinkNow); r.classList.toggle("open", r._open);
+      r.querySelector(".rh").onclick = () => { r._open = !r._open; r._user = true; r.classList.toggle("open", r._open); };
+    }
+    const now = live && !!m._thinkNow;
+    if (!r._user) { const want = now; if (r._open !== want) { r._open = want; r.classList.toggle("open", want); } }
+    r.classList.toggle("now", now);
+    const secs = now ? Math.max(1, Math.round((Date.now() - (m._t0 || Date.now())) / 1000)) : m.think_s;
+    r.querySelector(".lbl").textContent = now ? `Přemýšlím… ${secs || ""} s` : `Přemýšlel jsem ${num(Math.max(1, Math.round(secs || 1)))} s`;
+    const rt = r.querySelector(".rt");
+    if (rt._len !== m.thinking.length) { rt.textContent = m.thinking; rt._len = m.thinking.length; if (now) rt.scrollTop = rt.scrollHeight; }
+  }
+  paintTools(a, m) {
+    const box = a.querySelector(".tools");
+    const tools = m.tools || [];
+    const LIMIT = 6;
+    const showAll = box._all || tools.length <= LIMIT + 1;
+    const vis = showAll ? tools : tools.slice(-LIMIT);
+    const keep = new Set(vis.map(t => t.k));
+    [...box.querySelectorAll(".tool")].forEach(n => { if (!keep.has(n.dataset.k)) n.remove(); });
+    let more = box.querySelector(".more");
+    if (!showAll) {
+      if (!more) { more = document.createElement("button"); more.className = "more"; more.onclick = () => { box._all = true; this.paint(m); }; box.prepend(more); }
+      more.textContent = `+ ${tools.length - LIMIT} dalších kroků`;
+    } else if (more) more.remove();
+    for (const t of vis) {
+      let n = box.querySelector(`[data-k="${t.k}"]`);
+      if (!n) { n = document.createElement("div"); n.dataset.k = t.k; box.append(n); }
+      const cls = "tool " + t.state;
+      if (n.className !== cls) n.className = cls;
+      const icon = { run: I.run, done: I.done, fail: I.fail, stop: I.stop }[t.state] || I.run;
+      const html = `<span class="ti">${icon}</span><div class="tt">${t.note ? `<div class="tn">${esc(t.note)}</div>` : ""}<div class="tl">${t.computer ? `<span class="tdev">${esc(t.computer)}</span>` : ""}${esc(t.label)}</div>` +
+        (t.detail ? `<div class="td">${esc(t.detail)}</div>` : "") + (t.img ? `<img class="shot" src="${t.img}" alt="Snímek obrazovky">` : "") + "</div>";
+      if (n._h !== html) { n.innerHTML = html; n._h = html; }
+    }
+  }
+  async onClick(e) {
+    const img = e.target.closest(".shot, .thumbs img"); if (img) return lightbox(img.src);
+    const b = e.target.closest("button"); if (!b) return;
+    if (b.classList.contains("copy")) {
+      await navigator.clipboard.writeText(b.parentElement.querySelector("code").textContent);
+      b.innerHTML = I.check; setTimeout(() => (b.innerHTML = I.copy), 1400);
+    } else if (b.classList.contains("copy-msg")) {
+      const m = this.messages.get(b.closest(".msg").dataset.id);
+      await navigator.clipboard.writeText(m ? m.text : "");
+      b.innerHTML = I.check; setTimeout(() => (b.innerHTML = I.copy), 1400);
+    } else if (b.classList.contains("speak-stop")) api("/api/hush").catch(() => {});
+  }
+}
+function set(el, html) { if (el._h !== html) { el.innerHTML = html; el._h = html; } }
+
+const views = { chat: new View("chat", $("spaceChat")), devices: new View("devices", $("devicesChat")) };
+setInterval(() => { for (const v of Object.values(views)) if (v.live) { const m = v.messages.get(v.live); if (m && m._thinkNow) v.schedule(m.id); } }, 1000);
+
+// ---------- záložky ----------
+function moveInd() {
+  const on = $("tabs").querySelector("button.on"), ind = $("tabInd");
+  ind.style.width = on.offsetWidth + "px"; ind.style.transform = `translateX(${on.offsetLeft}px)`;
+}
+function setTab(tab) {
+  S.tab = tab;
+  $("tabs").querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.tab === tab));
+  $("spaceChat").classList.toggle("off", tab !== "chat");
+  $("spaceDevices").classList.toggle("off", tab !== "devices");
+  moveInd(); closeLevels();
+  $("head").classList.toggle("scrolled", views[tab].scroller.scrollTop > 4);
+  $("wipeInfo").textContent = tab === "chat" ? "Odstraní konverzaci v záložce Chat." : "Odstraní konverzaci v záložce Zařízení.";
+  try { localStorage.setItem("jirik.tab", tab); } catch {}
+  if (tab === "devices") { paintDevices(); if (!$("pvImg").querySelector("img")) refreshPreview(); }
+  setTimeout(() => views[tab].ta.focus(), 60);
+}
+$("tabs").onclick = e => { const b = e.target.closest("button[data-tab]"); if (b) setTab(b.dataset.tab); };
+window.addEventListener("resize", () => { moveInd(); positionLevels(); });
+
+// ---------- stav nahoře ----------
+function paintStatus() {
+  const st = S.status || {}, unc = S.settings.uncensored;
+  document.body.classList.toggle("uncensored", unc);
+  $("badge").classList.toggle("hidden", !unc);
+  const lv = S.models.levels.find(l => l.key === st.level);
+  let cls = "dot", label;
+  const busy = Object.values(views).some(v => v.live);
+  if (!S.connected) { cls += " bad"; label = "odpojeno"; }
+  else if (!st.ollama) { cls += " bad"; label = "Ollama neběží"; }
+  else if (!st.ready) { cls += " warn"; label = "model chybí"; }
+  else if (busy) { cls += " warn pulse"; label = lv ? lv.name : st.model; }
+  else { cls += " ok"; label = lv ? lv.name : st.model; }
+  $("sdot").className = cls; $("stext").textContent = label;
+  $("status").title = st.model ? `Model: ${st.model}${st.note ? "\n" + st.note : ""}` : "";
+  $("brand").classList.toggle("busy", busy);
+  $("voiceBtn").classList.toggle("off", !S.settings.voice);
+  setSwitch($("swVoice"), S.settings.voice, !S.voiceAvail);
+  setSwitch($("swUnc"), unc, false);
+  $("voiceInfo").textContent = S.voiceAvail ? "Hlas Jirka · běží na tomto počítači" : "Hlas není nainstalovaný (spusťte Setup.bat)";
+  const want = S.models.levels.find(l => l.key === S.settings.level);
+  for (const v of Object.values(views)) {
+    v.lvlbtn.querySelectorAll(".bars i").forEach((b, i) => b.classList.toggle("on", i < (LVL_IDX[S.settings.level] || 1)));
+    v.lvlbtn.querySelector(".nm").textContent = want ? want.name : "Nízká";
+    v.setGo();
+  }
+  $("lvlInfo").textContent = want ? `${want.name} · ${want.active_model}${st.note ? " · zatím " + (lv ? lv.name : "") : ""}` : "…";
+  $("modelInfo").innerHTML = unc ? "Bez omezení obsahu (abliterated verze stejných modelů)" : "Standardní modely Qwen3.5";
+  const n = S.nodes.length; $("devCount").hidden = !n; $("devCount").textContent = n;
+  paintHardware(); paintModelList();
+  if ($("levels").classList.contains("show")) renderLevels();
+}
+function setSwitch(sw, on, disabled) { sw.classList.toggle("on", !!on); sw.setAttribute("aria-checked", !!on); sw.disabled = !!disabled; }
+
+// ---------- úroveň myšlení ----------
+let levelsAnchor = null;
+function levelsPop(btn) {
+  if ($("levels").classList.contains("show") && levelsAnchor === btn) return closeLevels();
+  levelsAnchor = btn; renderLevels(); positionLevels();
+  $("levels").classList.add("show"); btn.classList.add("open");
+  api("/api/models", null, "GET").then(m => { S.models = m; renderLevels(); }).catch(() => {});
+}
+function closeLevels() { $("levels").classList.remove("show"); document.querySelectorAll(".lvlbtn.open").forEach(b => b.classList.remove("open")); }
+function positionLevels() {
+  if (!levelsAnchor) return;
+  const r = levelsAnchor.getBoundingClientRect(), p = $("levels"), w = p.offsetWidth || 440;
+  p.style.left = Math.max(12, Math.min(r.right - w, window.innerWidth - w - 12)) + "px";
+  p.style.bottom = (window.innerHeight - r.top + 10) + "px";
+}
+document.addEventListener("mousedown", e => { if (!e.target.closest("#levels, .lvlbtn, #lvlOpen")) closeLevels(); });
+const FIT = { gpu: "Celý v grafice", mostly: "Část v paměti RAM", cpu: "Hlavně v RAM – pomalý", no: "Na tento počítač je moc velký" };
+function renderLevels() {
+  const hw = S.models.hardware || {}, pulls = S.models.pulls || {};
+  const hwLine = [hw.gpu ? `${hw.gpu.replace(/NVIDIA |GeForce |Laptop GPU/g, "").trim()} · ${num(hw.vram_gb)} GB` : "Bez grafiky NVIDIA",
+                  `${num(Math.round(hw.ram_gb || 0))} GB RAM`, `${num(Math.round(hw.disk_free_gb || 0))} GB volno`].join(" · ");
+  const rows = (S.models.levels || []).map(l => {
+    const sel = l.key === S.settings.level;
+    const pull = pulls[l.active_model];
+    let act;
+    if (pull && !pull.error) {
+      const pct = pull.total ? Math.round(100 * pull.completed / pull.total) : 0;
+      act = `<div class="prog"><div class="pb"><i style="width:${pct}%"></i></div><div class="pt"><span>${esc(pull.status)} ${pull.total ? pct + " %" : ""}</span><button data-cancel="${esc(l.active_model)}" title="Zrušit">✕</button></div></div>`;
+    } else if (!l.installed) act = `<button class="dl" data-pull="${l.key}">${I.dl}${num(l.download_gb)} GB</button>`;
+    else act = "";
+    const speed = l.tok_s ? `${l.measured ? "" : "≈ "}${num(Math.round(l.tok_s))} tok/s${l.slower && l.slower > 1.15 ? ` · ${num(l.slower)}× pomalejší` : ""}` : "";
+    const think = l.think ? " · přemýšlí před odpovědí" : "";
+    return `<button class="lv${sel ? " sel" : ""}" data-lv="${l.key}"><span class="radio"></span>
+      <span><span class="nm">${esc(l.name)}<small>${esc(l.params)}</small></span><span class="ds">${esc(l.blurb)}</span>
+      <span class="sp"><span class="fit ${l.fit}">${FIT[l.fit]}</span>${speed ? `<span>· ${speed}</span>` : ""}${think ? `<span>· ${think.slice(3)}</span>` : ""}</span></span>
+      <span class="act">${act}</span></button>`;
+  }).join("");
+  $("levels").innerHTML = `<div class="lv-head"><b>Úroveň myšlení</b><small>${esc(hwLine)}</small></div>${rows}
+    <div class="lv-foot"><span>Necenzurovaný režim<small> · ${S.settings.uncensored ? "zapnutý" : "vypnutý"}</small></span>
+    <button class="switch hot${S.settings.uncensored ? " on" : ""}" id="lvUnc" role="switch"></button></div>`;
+  if (pulls && S.pendingSelect) {
+    const l = S.models.levels.find(x => x.key === S.pendingSelect);
+    if (l && l.installed) { const k = S.pendingSelect; S.pendingSelect = null; setSetting({ level: k }); }
+  }
+}
+$("levels").addEventListener("click", async e => {
+  const c = e.target.closest("[data-cancel]");
+  if (c) { e.stopPropagation(); await api("/api/models/cancel", { model: c.dataset.cancel }).catch(() => {}); return; }
+  const p = e.target.closest("[data-pull]");
+  if (p) {
+    e.stopPropagation(); const key = p.dataset.pull; S.pendingSelect = key;
+    const r = await api("/api/models/pull", { level: key }).catch(() => ({ ok: false, error: "Server neodpovídá." }));
+    if (!r.ok) { toast(r.error || "Stahování se nepovedlo."); S.pendingSelect = null; }
+    else { S.models.pulls[r.model] = { model: r.model, status: "Připravuji…", completed: 0, total: 0 }; renderLevels(); }
+    return;
+  }
+  if (e.target.closest("#lvUnc")) return setSetting({ uncensored: !S.settings.uncensored });
+  const b = e.target.closest("[data-lv]"); if (!b) return;
+  const l = S.models.levels.find(x => x.key === b.dataset.lv);
+  if (!l) return;
+  if (!l.installed) { b.querySelector("[data-pull]")?.click(); return; }
+  if (l.fit === "no") toast("Tahle úroveň je na tento počítač moc velká – může být velmi pomalá.");
+  setSetting({ level: l.key });
+});
+$("lvlOpen").onclick = e => { sheet(false); setTimeout(() => levelsPop(views[S.tab].lvlbtn), 380); };
+
+// ---------- nastavení ----------
+function sheet(open) { document.body.classList.toggle("sheet-open", open); if (open) refreshModels(); }
+$("setBtn").onclick = () => sheet(true);
+$("closeSheet").onclick = $("scrim").onclick = () => sheet(false);
+$("swVoice").onclick = () => setSetting({ voice: !S.settings.voice });
+$("voiceBtn").onclick = () => setSetting({ voice: !S.settings.voice });
+$("swUnc").onclick = () => setSetting({ uncensored: !S.settings.uncensored });
+async function setSetting(ch) {
+  Object.assign(S.settings, ch); paintStatus();
+  try { await api("/api/settings", ch); } catch { toast("Nastavení se nepodařilo uložit."); }
+  if ("uncensored" in ch) toast(ch.uncensored ? "Necenzurovaný režim zapnutý" : "Standardní režim");
+  if ("level" in ch) { const l = S.models.levels.find(x => x.key === ch.level); if (l) toast(`Myšlení: ${l.name}`); }
+}
+$("wipe").onclick = async e => {
+  const b = e.currentTarget;
+  if (!b.dataset.sure) { b.dataset.sure = "1"; b.textContent = "Opravdu?"; setTimeout(() => { b.textContent = "Smazat"; delete b.dataset.sure; }, 3000); return; }
+  await api("/api/clear", { space: S.tab }); sheet(false); toast("Historie smazána");
+};
+$("newBtn").onclick = () => api("/api/clear", { space: S.tab }).catch(() => {});
+function paintHardware() {
+  const hw = S.models.hardware || {};
+  set($("hwCard"), `<div><small>Grafika</small><b title="${esc(hw.gpu || "")}">${hw.vram_gb ? num(hw.vram_gb) + " GB" : "—"}</b></div>
+    <div><small>Paměť</small><b>${num(Math.round(hw.ram_gb || 0))} GB</b></div><div><small>Disk volno</small><b>${num(Math.round(hw.disk_free_gb || 0))} GB</b></div>`);
+}
+function paintModelList() {
+  const rows = [], seen = new Set();
+  for (const l of S.models.levels || []) {
+    for (const [m, unc] of [[l.model, false], [l.uncensored, true]]) {
+      if (seen.has(m)) continue; seen.add(m);
+      const inst = (S.models.installed || []).includes(m);
+      if (!inst) continue;
+      rows.push(`<div class="item"><div class="t"><b>${esc(l.params.split(" ")[0])}${unc ? " · bez cenzury" : ""}</b><small><code>${esc(m)}</code> · ${num(l.download_gb)} GB</small></div>
+        <button class="btn danger sm" data-del="${esc(m)}">${I.trash}</button></div>`);
+    }
+  }
+  set($("modelList"), rows.join("") || `<div class="item"><div class="t"><small>Zatím žádné – stáhněte úroveň v nabídce Myšlení.</small></div></div>`);
+}
+$("modelList").onclick = async e => {
+  const b = e.target.closest("[data-del]"); if (!b) return;
+  if (!b.dataset.sure) { b.dataset.sure = "1"; b.innerHTML = "Smazat?"; setTimeout(() => { b.innerHTML = I.trash; delete b.dataset.sure; }, 3000); return; }
+  const r = await api("/api/models/delete", { model: b.dataset.del }).catch(() => ({ ok: false }));
+  toast(r.ok ? "Model smazán" : (r.error || "Smazání se nepovedlo.")); refreshModels();
+};
+async function refreshModels() {
+  try { const m = await api("/api/models", null, "GET"); S.models = { ...m, installed: installedFrom(m) }; paintStatus(); } catch {}
+}
+function installedFrom(models) { return (models && models.installed) || []; }
+
+// ---------- zařízení ----------
+function allDevices() {
+  const local = S.devices.find(d => !d.remote);
+  const out = [{ id: "local", name: "Tento počítač", state: local && local.online ? "online" : "offline", locked: local && local.locked, sub: "Tento počítač" }];
+  for (const n of S.nodes) out.push({ id: n.id, name: n.name, state: n.state, locked: n.locked, fg: n.foreground, ip: n.ip, mac: n.mac });
+  return out;
+}
+function targetName() { const d = allDevices().find(x => x.id === S.target); return d ? d.name : "Tento počítač"; }
+const STATE = { online: ["ok", "Připojený"], sleeping: ["", "Spí · probudí se sám"], offline: ["bad", "Nedostupný"] };
+function paintDevices() {
+  const list = allDevices();
+  if (!list.find(d => d.id === S.target)) S.target = "local";
+  const html = list.map(d => {
+    const [c, t] = STATE[d.state] || STATE.offline;
+    const sub = d.locked ? "Zamčený – myš nefunguje" : (d.state === "online" && d.fg ? d.fg : t);
+    const acts = d.id === "local" ? "" : `<span class="dact">${d.state !== "online" ? `<span class="mini" data-wake="${d.id}" title="Probudit">${I.power}</span>` : ""}
+      <span class="mini" data-rename="${d.id}" title="Přejmenovat">${I.edit}</span><span class="mini" data-remove="${d.id}" title="Odebrat">${I.trash}</span></span>`;
+    return `<button class="dev${S.target === d.id ? " sel" : ""}" data-dev="${d.id}"><span class="di">${I.pc}<span class="dot ${d.locked ? "warn" : c}"></span></span>
+      <span style="min-width:0"><span class="dn" style="display:block">${esc(d.name)}</span><span class="dsub" style="display:block">${esc(sub)}</span></span>${acts}</button>`;
+  }).join("") + `<button class="addcard" id="addCard"><span class="plus"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>
+    <span><b>Přidat zařízení</b><small>${S.nodes.length ? "Další počítač ve stejné síti" : "Ovládej i další počítače v síti – zabere to minutu"}</small></span></button>`;
+  set($("devList"), html);
+  $("pvName").textContent = targetName();
+  const tc = views.devices.tchip; tc.hidden = false; tc.textContent = "→ " + targetName();
+}
+$("devList").addEventListener("click", async e => {
+  if (e.target.closest("#addCard")) return openWizard();
+  const w = e.target.closest("[data-wake]"), rn = e.target.closest("[data-rename]"), rm = e.target.closest("[data-remove]");
+  if (w) {
+    e.stopPropagation(); toast("Budím zařízení…");
+    const r = await api("/api/link/wake/" + encodeURIComponent(w.dataset.wake)).catch(() => ({ ok: false }));
+    toast(r.ok ? "Zařízení je připojené." : (r.error || "Nepodařilo se probudit.")); return;
+  }
+  if (rn) {
+    e.stopPropagation(); const d = allDevices().find(x => x.id === rn.dataset.rename);
+    const name = prompt("Nové jméno zařízení:", d ? d.name : ""); if (!name) return;
+    await api("/api/link/rename/" + encodeURIComponent(rn.dataset.rename), { name }).catch(() => {}); return;
+  }
+  if (rm) {
+    e.stopPropagation();
+    if (!rm.dataset.sure) { rm.dataset.sure = "1"; toast("Klikni znovu pro odebrání – jeho klíč přestane platit."); setTimeout(() => delete rm.dataset.sure, 3000); return; }
+    await api("/api/link/remove/" + encodeURIComponent(rm.dataset.remove)).catch(() => {}); toast("Zařízení odebráno."); return;
+  }
+  const d = e.target.closest("[data-dev]");
+  if (d) { S.target = d.dataset.dev; paintDevices(); refreshPreview(); views.devices.ta.focus(); }
+});
+$("addDev").onclick = () => openWizard();
+let pvBusy = false;
+async function refreshPreview() {
+  if (pvBusy) return; pvBusy = true;
+  const box = $("pvImg"), id = S.target;
+  if (!box.querySelector("img")) box.innerHTML = I.spinner;
+  try {
+    const r = await api(`/api/devices/${encodeURIComponent(id)}/screen`, null, "GET");
+    if (id !== S.target) return;
+    if (r.ok) { box.innerHTML = `<img src="${r.image}" alt="">`; box.querySelector("img").onclick = () => lightbox(r.image); }
+    else box.innerHTML = `<span>${esc(r.locked ? "Obrazovka je zamčená." : r.error || "Náhled není k dispozici.")}</span>`;
+  } catch { box.innerHTML = "<span>Náhled není k dispozici.</span>"; }
+  finally { pvBusy = false; }
+}
+$("pvRefresh").onclick = refreshPreview;
+
+// ---------- průvodce párováním ----------
+let wzTimer = null;
+function openWizard() { $("wizard").classList.add("show"); renderWizard(); }
+function closeWizard() {
+  $("wizard").classList.remove("show");
+  if (S.pairing && ["waiting", "code"].includes(S.pairing.state)) api("/api/link/pair/close").catch(() => {});
+}
+$("wzClose").onclick = closeWizard;
+$("wizard").querySelector(".bg").onclick = closeWizard;
+function steps(n) { $("wizard").querySelectorAll(".steps i").forEach((s, i) => s.classList.toggle("on", i < n)); }
+function renderWizard() {
+  const p = S.pairing, body = $("wzBody");
+  clearInterval(wzTimer);
+  let html;
+  if (!p || ["closed"].includes(p.state)) {
+    steps(0);
+    html = `<div class="step"><h2>Přidat zařízení</h2><p>Jiřík pak bude umět ovládat i tento další počítač – klikat, psát, spouštět programy. Počítač musí být ve stejné síti (Wi-Fi).</p>
+      <ol><li>Otevřu na 15 minut odkaz v místní síti.</li><li>Na druhém počítači ho otevřeš a spustíš instalátor.</li><li>Potvrdíš, že oba počítače ukazují stejný kód.</li></ol>
+      <p class="tiny">Spojení je šifrované a každé zařízení dostane vlastní klíč. Napoprvé Windows požádá o povolení ve firewallu.</p>
+      <div class="acts"><button class="btn ghost" data-wz="close">Zrušit</button><button class="btn solid" data-wz="open">Začít</button></div></div>`;
+  } else if (p.state === "waiting") {
+    steps(1);
+    const urls = p.urls || [];
+    html = `<div class="step"><h2>Otevři odkaz na druhém počítači</h2><p>Do prohlížeče na počítači, který chceš přidat, napiš tuto adresu:</p>
+      ${urls.slice(0, 2).map(u => `<div class="url"><code>${esc(u)}</code><button class="btn line sm" data-copy="${esc(u)}">Kopírovat</button></div>`).join("")}
+      <ol><li>Stáhni instalátor (prohlížeč se může zeptat – zvol <b>Ponechat</b>).</li><li>Spusť ho dvojklikem – vše potřebné se doinstaluje samo.</li></ol>
+      <div class="wait">${I.spinner}<span>Čekám, až se druhý počítač ozve… <span class="tiny" id="wzLeft"></span></span></div>
+      <div class="acts"><button class="btn ghost" data-wz="close">Zrušit</button></div></div>`;
+  } else if (p.state === "code") {
+    steps(2);
+    html = `<div class="step"><h2>Shodují se kódy?</h2><p>Ozval se počítač <b>${esc(p.host || "?")}</b>. Na jeho obrazovce teď svítí kód – musí být stejný jako tady:</p>
+      <div class="code">${esc(p.code.slice(0, 3))}<span> </span>${esc(p.code.slice(3))}</div>
+      <label class="field"><small>Jak se má zařízení jmenovat</small><input id="wzName" maxlength="40" value="${esc(p.host || "")}"></label>
+      <div class="acts"><button class="btn ghost" data-wz="no">Neshodují se</button><button class="btn solid" data-wz="yes">Kódy se shodují</button></div></div>`;
+  } else if (p.state === "confirmed" || p.state === "done") {
+    steps(3);
+    html = `<div class="step" style="text-align:center"><div class="okmark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7"/></svg></div>
+      <h2>Hotovo</h2><p>${p.state === "done" ? "Zařízení je spárované a za chvíli se objeví v seznamu." : "Dokončuji instalaci na druhém počítači…"}</p>
+      <div class="acts" style="justify-content:center"><button class="btn solid" data-wz="finish">Zavřít</button></div></div>`;
+  } else {
+    steps(0);
+    const why = { rejected: "Párování bylo zrušeno – kódy se neshodovaly.", expired: "Čas na spárování vypršel." }[p.state] || "Párování skončilo.";
+    html = `<div class="step"><h2>Nepovedlo se</h2><p>${why}</p><div class="acts"><button class="btn ghost" data-wz="close">Zavřít</button><button class="btn solid" data-wz="open">Zkusit znovu</button></div></div>`;
+  }
+  if (body._state !== (p ? p.state : "none")) { body.innerHTML = html; body._state = p ? p.state : "none"; }
+  if (p && p.state === "waiting") {
+    let left = p.expires;
+    const tick = () => { const el = $("wzLeft"); if (el) el.textContent = `(${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")})`; left = Math.max(0, left - 1); };
+    tick(); wzTimer = setInterval(tick, 1000);
+  }
+}
+$("wzBody").addEventListener("click", async e => {
+  const c = e.target.closest("[data-copy]");
+  if (c) { await navigator.clipboard.writeText(c.dataset.copy); c.textContent = "Zkopírováno"; setTimeout(() => (c.textContent = "Kopírovat"), 1500); return; }
+  const b = e.target.closest("[data-wz]"); if (!b) return;
+  const a = b.dataset.wz;
+  if (a === "close") return closeWizard();
+  if (a === "finish") { $("wizard").classList.remove("show"); S.pairing = null; return; }
+  if (a === "open") {
+    b.disabled = true;
+    const r = await api("/api/link/pair/open").catch(() => ({ ok: false, error: "Server neodpovídá." }));
+    if (!r.ok) { toast(r.error || "Párování nejde otevřít."); b.disabled = false; return; }
+    if (r.firewall_prompt) toast("Povol prosím ve Windows okno firewallu.");
+    S.pairing = r.pairing; renderWizard(); return;
+  }
+  if (a === "yes" || a === "no") {
+    b.disabled = true;
+    const r = await api("/api/link/pair/confirm", { ok: a === "yes", name: ($("wzName") || {}).value || "" }).catch(() => ({ ok: false }));
+    if (a === "yes" && !r.ok) toast(r.error || "Potvrzení se nepovedlo.");
+  }
+});
+
+// ---------- klávesy ----------
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") {
+    if ($("lightbox").classList.contains("show")) return $("lightbox").classList.remove("show");
+    if ($("levels").classList.contains("show")) return closeLevels();
+    if ($("wizard").classList.contains("show")) return closeWizard();
+    if (document.body.classList.contains("sheet-open")) return sheet(false);
+    const v = views[S.tab];
+    if (v.live) api("/api/stop", { space: S.tab }).catch(() => {}); else api("/api/hush").catch(() => {});
+  }
+  if (e.ctrlKey && e.key.toLowerCase() === "n") { e.preventDefault(); api("/api/clear", { space: S.tab }).catch(() => {}); views[S.tab].ta.focus(); }
+  if (e.ctrlKey && (e.key === "1" || e.key === "2")) { e.preventDefault(); setTab(e.key === "1" ? "chat" : "devices"); }
+});
+
+// ---------- spojení se serverem ----------
+function onMsg(m) {
+  const v = m.space ? views[m.space] : null;
+  switch (m.type) {
+    case "snapshot":
+      S.connected = true; S.settings = m.settings; S.status = m.status; S.voiceAvail = m.voice; S.devices = m.devices;
+      S.nodes = m.nodes; S.pairing = m.pairing; S.userName = m.user_name || ""; S.models = { ...m.models, installed: installedFrom(m.models) };
+      for (const [k, sp] of Object.entries(m.spaces || {})) views[k].reset(sp.messages, sp.current);
+      if (!S.booted) {
+        S.booted = true; $("boot").classList.add("gone");
+        let t = "chat"; try { t = localStorage.getItem("jirik.tab") || "chat"; } catch {}
+        setTab(t === "devices" ? "devices" : "chat");
+      }
+      paintDevices();
+      break;
+    case "chat.user": v && v.add(m.msg); break;
+    case "chat.start": if (v) { v.live = m.msg.id; v.add(m.msg); } break;
+    case "chat.delta": { const x = v && v.messages.get(m.id); if (x) { x.text += m.d; x._thinkNow = false; v.schedule(m.id); } break; }
+    case "chat.text": { const x = v && v.messages.get(m.id); if (x) { x.text = m.text; v.schedule(m.id); } break; }
+    case "chat.think": { const x = v && v.messages.get(m.id); if (x) { if (!x._thinkNow) x._t0 = Date.now(); x.thinking = (x.thinking || "") + m.d; x._thinkNow = true; v.schedule(m.id); } break; }
+    case "chat.meta": { const x = v && v.messages.get(m.id); if (x) { Object.assign(x, m); if ("think_s" in m) x._thinkNow = false; v.schedule(m.id); } break; }
+    case "chat.tool": {
+      const x = v && v.messages.get(m.id); if (!x) break;
+      x._thinkNow = false;
+      const i = x.tools.findIndex(t => t.k === m.tool.k);
+      if (i < 0) x.tools.push(m.tool); else x.tools[i] = m.tool;
+      v.schedule(m.id);
+      if (m.space === "devices" && m.tool.img && m.tool.state !== "run") {
+        const box = $("pvImg"); box.innerHTML = `<img src="${m.tool.img}" alt="">`; box.querySelector("img").onclick = () => lightbox(m.tool.img);
+      }
+      break;
+    }
+    case "chat.end": if (v) { if (v.live === m.msg.id) v.live = null; m.msg._thinkNow = false; v.add(m.msg); v.schedule(m.msg.id); } break;
+    case "chat.clear": if (v) v.reset([], null); break;
+    case "speech": {
+      const prev = S.speaking; S.speaking = m.on ? m.id : (S.speaking === m.id ? null : S.speaking);
+      for (const vw of Object.values(views)) [prev, S.speaking].forEach(id => id && vw.messages.has(id) && vw.schedule(id));
+      break;
+    }
+    case "settings": S.settings = m.settings; S.status = m.status; if (m.models) S.models = { ...m.models, installed: installedFrom(m.models) }; break;
+    case "devices": S.devices = m.devices; S.nodes = m.nodes; paintDevices(); break;
+    case "nodes": S.nodes = m.nodes; paintDevices(); break;
+    case "pairing": S.pairing = m.pairing; if ($("wizard").classList.contains("show")) renderWizard(); break;
+    case "pull": S.models.pulls = S.models.pulls || {}; S.models.pulls[m.model] = m; if (m.error) toast(m.error); renderLevelsIfOpen(); break;
+    case "models.changed":
+      api("/api/models", null, "GET").then(x => { S.models = { ...x, installed: installedFrom(x) }; paintStatus(); }).catch(() => {});
+      fetch("/api/state").then(r => r.json()).then(st => { S.status = st.status; paintStatus(); }).catch(() => {});
+      break;
+  }
+  paintStatus();
+}
+function renderLevelsIfOpen() { if ($("levels").classList.contains("show")) renderLevels(); }
+let retry = 0;
 function connect() {
   const ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws/ui");
-  ws.onopen = () => { $("bootText").textContent = "Připojeno"; };
-  ws.onmessage = ev => {
-    const m = JSON.parse(ev.data);
-    if (m.type === "snapshot") {
-      devices(m.devices); refreshState();
-      if (!booted) { booted = true; $("boot").classList.add("gone"); showHello(); ta.focus(); }
-    } else if (m.type === "devices") devices(m.devices);
-    else if (m.type === "say") onSay(m.text);
-    else if (m.type === "reply") onReply(m.reply, true);
-    else if (m.type === "agent" && busy) progress(`Krok ${m.step}: ${m.action}`);
-  };
+  ws.onopen = () => { retry = 0; };
+  ws.onmessage = ev => { try { onMsg(JSON.parse(ev.data)); } catch (e) { console.error(e); } };
   ws.onclose = () => {
-    if (!booted) $("bootText").textContent = "Čekám na server Aiko…";
-    else setChip("pcChip", "wait", "spojení přerušeno");
-    setTimeout(connect, 1500);
+    S.connected = false; paintStatus();
+    if (!S.booted) $("bootText").textContent = "Čekám na server Jiříka…";
+    setTimeout(connect, Math.min(4000, 400 + retry++ * 400));
   };
 }
+setInterval(async () => {
+  if (!S.connected) return;
+  try { const st = await (await fetch("/api/state")).json(); S.status = st.status; S.nodes = st.nodes;
+        S.models = { ...st.models, installed: installedFrom(st.models) }; paintStatus(); paintDevices(); } catch {}
+}, 20000);
 connect();
-setInterval(refreshState, 15000);
+requestAnimationFrame(moveInd);
 </script>
 </body>
 </html>

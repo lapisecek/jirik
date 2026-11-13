@@ -29,12 +29,12 @@ def main() -> int:
     env = {**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8", "AIKO_CONFIG": str(HERE / "aiko.toml")}
     env.pop("AIKO_TOKEN", None)
     if not (HERE / "voices" / "cs_CZ-jirka-medium.onnx").exists():
-        print("[!] Chybí hlas voices/cs_CZ-jirka-medium.onnx – Aiko bude mluvit hlasem prohlížeče.")
+        print("[!] Chybí hlas voices/cs_CZ-jirka-medium.onnx – Jiřík bude bez hlasu.")
     if not up("http://localhost:11434/api/tags"):
-        print("[!] Ollama neběží – spusťte aplikaci Ollama. Bez ní Aiko rozumí jen jednoduchým větám "
+        print("[!] Ollama neběží – spusťte aplikaci Ollama. Bez ní Jiřík nemůže odpovídat "
               "a neumí klikat na obrazovce.")
     if up(f"{URL}/api/hello"):
-        print(f"Aiko už běží – otevírám {URL}")
+        print(f"Jiřík už běží – otevírám {URL}")
         webbrowser.open(URL)
         return 0
     py = sys.executable
@@ -48,13 +48,13 @@ def main() -> int:
                 return 1
             time.sleep(0.5)
         procs.append(subprocess.Popen([py, "-m", "aiko.agents.pc", "--server", f"ws://127.0.0.1:{PORT}/ws/device",
-                                       "--name", "Můj počítač"], cwd=HERE, env=env))
+                                       "--name", "Tento počítač"], cwd=HERE, env=env))
         time.sleep(1.5)
         webbrowser.open(URL)
-        print(f"\n=== Aiko běží: {URL}  (ukončení: zavřete toto okno nebo Ctrl+C) ===\n")
+        print(f"\n=== Jiřík běží: {URL}  (ukončení: zavřete toto okno nebo Ctrl+C) ===\n")
         while procs[0].poll() is None:        # ovládání počítače jde znovu spustit tlačítkem „Spustit vše“
             time.sleep(1)
-        print("[!] Server Aiko skončil.")
+        print("[!] Server Jiříka skončil.")
         return 1
     except KeyboardInterrupt:
         return 0

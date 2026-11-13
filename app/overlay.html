@@ -5,26 +5,26 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline'">
 <title></title>
 <style>
-  /* Zářící rámeček kolem obrazovky, když Aiko ovládá počítač. Kliky jdou skrz, snímky obrazovky ho nevidí. */
-  @property --a { syntax: "<angle>"; inherits: true; initial-value: 0deg; }
+  /* Rámeček kolem obrazovky, když Aiko ovládá počítač. Plná barva, žádná záře.
+     Kliky jdou skrz a na snímcích obrazovky pro model není vidět. */
+  :root { --accent: #E0492A; --out: cubic-bezier(.16, 1, .3, 1); }
   html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
-  .frame { position: fixed; inset: 0; opacity: 0; transition: opacity .7s ease; --a: 0deg;
-           animation: spin 5s linear infinite; }
-  .on .frame { opacity: 1; }
-  .ring, .glow { position: absolute; inset: 0; border-radius: 12px;
-    background: conic-gradient(from var(--a), #6d84ff, #a86dff, #ff6dbd, #ffad6d, #6dd6ff, #6d84ff);
-    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-    -webkit-mask-composite: xor; mask-composite: exclude; }
-  .ring { padding: 4px; }
-  .glow { padding: 26px; filter: blur(22px); opacity: .55; animation: breathe 2.6s ease-in-out infinite; }
-  .tint { position: absolute; inset: 0; box-shadow: inset 0 0 140px rgba(120, 110, 255, .16); }
-  @keyframes spin { to { --a: 360deg; } }
-  @keyframes breathe { 50% { opacity: .9; } }
-  @media (prefers-reduced-motion: reduce) { .frame, .glow { animation: none; } }
+  .edge { position: fixed; background: var(--accent); transition: transform .7s var(--out); }
+  .t, .b { left: 0; right: 0; height: 3px; transform: scaleX(0); }
+  .l, .r { top: 0; bottom: 0; width: 3px; transform: scaleY(0); }
+  .t { top: 0; transform-origin: left; } .b { bottom: 0; transform-origin: right; }
+  .l { left: 0; transform-origin: bottom; } .r { right: 0; transform-origin: top; }
+  .on .t, .on .b { transform: scaleX(1); } .on .l, .on .r { transform: scaleY(1); }
+  .on .r { transition-delay: .08s; } .on .b { transition-delay: .16s; } .on .l { transition-delay: .24s; }
+  /* jezdec po horní hraně – ukazuje, že se pracuje */
+  .run { position: fixed; top: 0; left: 0; height: 3px; width: 18vw; background: #1B1A17; opacity: 0; transition: opacity .4s; }
+  .on .run { opacity: .55; animation: run 2.4s cubic-bezier(.65,0,.35,1) infinite alternate; }
+  @keyframes run { from { transform: translateX(0); } to { transform: translateX(82vw); } }
+  @media (prefers-reduced-motion: reduce) { .on .run { animation: none; } }
 </style>
 </head>
 <body>
-<div class="frame"><div class="tint"></div><div class="glow"></div><div class="ring"></div></div>
+<div class="edge t"></div><div class="edge r"></div><div class="edge b"></div><div class="edge l"></div><div class="run"></div>
 <script>
 function setOn(on) { document.body.classList.toggle("on", on); }
 </script>

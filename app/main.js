@@ -10,7 +10,7 @@ const ROOT = path.resolve(__dirname, "..");
 const PORT = 8770;
 const URL = `http://127.0.0.1:${PORT}`;
 const PY = path.join(ROOT, ".venv", "Scripts", "python.exe");
-const ICON = path.join(__dirname, "assets", "aiko.ico");
+const ICON = path.join(__dirname, "assets", "jirik.ico");
 const LOGS = path.join(ROOT, "data", "logs");
 
 let main = null;
@@ -19,7 +19,7 @@ let overlays = [];
 const children = {};
 let quitting = false;
 
-app.setAppUserModelId("cz.aiko.local");
+app.setAppUserModelId("cz.jirik.local");
 if (!app.requestSingleInstanceLock()) app.quit();
 app.on("second-instance", () => showMain());
 
@@ -42,7 +42,7 @@ function log(...a) {
   } catch { /* nevadí */ }
 }
 function theme() {
-  return nativeTheme.shouldUseDarkColors ? { bg: "#0f1115", fg: "#e9ebef" } : { bg: "#f6f7f9", fg: "#15171a" };
+  return nativeTheme.shouldUseDarkColors ? { bg: "#131210", fg: "#EEEBE4" } : { bg: "#F4F2EE", fg: "#1B1A17" };
 }
 function status(text, error = false) {
   log("status:", text);
@@ -64,38 +64,49 @@ function startPython(name, args) {
     delete children[name];
     if (quitting) return;
     if (name === "pc") setTimeout(startPc, 3000);              // ovládání počítače se samo vrátí
-    if (name === "server") status("Server Aiko se zastavil. Podrobnosti jsou v data/logs/server.log.", true);
+    if (name === "server") status("Server Jiříka se zastavil. Podrobnosti jsou v data/logs/server.log.", true);
   });
   return p;
 }
 function startPc() {
   if (quitting || children.pc) return;
-  startPython("pc", ["-m", "aiko.agents.pc", "--server", `ws://127.0.0.1:${PORT}/ws/device`, "--name", "Můj počítač"]);
+  startPython("pc", ["-m", "aiko.agents.pc", "--server", `ws://127.0.0.1:${PORT}/ws/device`, "--name", "Tento počítač"]);
 }
 
 async function startEverything() {
   if (!fs.existsSync(PY)) {
-    status("Aiko ještě není nainstalovaná. Spusťte ve složce Aiko-Local soubor Setup.bat.", true);
-    return false;
+    // první spuštění: instalace se otevře sama v okně a aplikace počká, až doběhne
+    status("První spuštění – instaluji vše potřebné (otevřelo se okno instalace)…");
+    try {
+      spawn("cmd.exe", ["/c", "start", "Jiřík – instalace", "/wait", "powershell", "-NoProfile", "-ExecutionPolicy", "Bypass",
+                        "-File", path.join(ROOT, "setup.ps1")], { cwd: ROOT, detached: true, stdio: "ignore" }).unref();
+    } catch (e) { log("setup", e); }
+    for (let i = 0; i < 3600 && !fs.existsSync(path.join(ROOT, "voices", "cs_CZ-jirka-medium.onnx.json")); i++) await sleep(1000);
+    if (!fs.existsSync(PY)) { status("Instalace se nedokončila. Spusťte Setup.bat ve složce Jiříka.", true); return false; }
+    status("Instalace hotová – spouštím…");
   }
   status("Spouštím model…");
   if (!(await ok("http://localhost:11434/api/tags"))) {
     try {
-      spawn("ollama", ["serve"], { detached: true, stdio: "ignore", windowsHide: true }).unref();
+      const env = { ...process.env, OLLAMA_FLASH_ATTENTION: "1", OLLAMA_KV_CACHE_TYPE: "q8_0" };
+      const app = path.join(process.env.LOCALAPPDATA || "", "Programs", "Ollama", "ollama app.exe");
+      if (fs.existsSync(app)) spawn(app, [], { detached: true, stdio: "ignore", env }).unref();
+      else spawn("ollama", ["serve"], { detached: true, stdio: "ignore", windowsHide: true, env }).unref();
     } catch (e) { log("ollama", e); }
+    for (let i = 0; i < 40 && !(await ok("http://localhost:11434/api/tags")); i++) await sleep(500);
   }
   if (!(await ok(`${URL}/api/hello`))) {
-    status("Spouštím Aiko…");
+    status("Spouštím Jiříka…");
     startPython("server", ["-m", "aiko.server", "--config", "aiko.toml", "--no-mdns"]);
     for (let i = 0; i < 360 && !(await ok(`${URL}/api/hello`)); i++) {
       if (!children.server) return false;
-      if (i === 8) status("Načítám hlas Jirka a model…");
+      if (i === 8) status("Načítám hlas a model…");
       if (i === 60) status("Ještě chvilku – první start trvá déle…");
       await sleep(500);
     }
   }
   const st = await json(`${URL}/api/state`);
-  if (!(st && (st.devices || []).some(d => d.kind === "pc" && d.online))) startPc();
+  if (!(st && (st.devices || []).some(d => !d.remote && d.online))) startPc();
   return true;
 }
 
@@ -103,9 +114,9 @@ async function startEverything() {
 function createMain() {
   const t = theme();
   main = new BrowserWindow({
-    width: 1040, height: 780, minWidth: 420, minHeight: 540, show: false, title: "Aiko", icon: ICON,
+    width: 1080, height: 800, minWidth: 440, minHeight: 560, show: false, title: "Jiřík", icon: ICON,
     backgroundColor: t.bg, titleBarStyle: "hidden",
-    titleBarOverlay: { color: t.bg, symbolColor: t.fg, height: 56 },
+    titleBarOverlay: { color: t.bg, symbolColor: t.fg, height: 52 },
     webPreferences: { preload: path.join(__dirname, "preload.js") },
   });
   main.setMenuBarVisibility(false);
@@ -126,8 +137,11 @@ function showMain() {
   main.flashFrame(false);
 }
 
-// ---------- „Aiko pracuje“: zářící rámeček + stavová lišta ----------
-function createOverlays() {
+// ---------- „Aiko pracuje“: rámeček kolem obrazovky + stavová lišta ----------
+// Okna se vytvoří až při první práci (nestojí paměť, dokud nejsou potřeba) a pak se jen ukazují.
+function ensureOverlays() {
+  if (pill && !pill.isDestroyed()) return;
+  overlays = [];
   for (const d of screen.getAllDisplays()) {
     const w = new BrowserWindow({
       ...d.bounds, transparent: true, frame: false, resizable: false, movable: false, focusable: false,
@@ -135,16 +149,16 @@ function createOverlays() {
       webPreferences: { backgroundThrottling: false },
     });
     w.setAlwaysOnTop(true, "screen-saver");
-    w.setIgnoreMouseEvents(true);          // kliky jdou skrz – Aiko i člověk ovládají okna pod ním
-    w.setContentProtection(true);          // na snímcích obrazovky pro Aiko rámeček není
+    w.setIgnoreMouseEvents(true);          // kliky jdou skrz
+    w.setContentProtection(true);          // na snímcích obrazovky pro model rámeček není
     w.setBounds(d.bounds);
     w.loadFile(path.join(__dirname, "overlay.html"));
     overlays.push(w);
   }
   const wa = screen.getPrimaryDisplay().workArea;
-  const W = 480, H = 64;
+  const W = 460, H = 60;
   pill = new BrowserWindow({
-    x: Math.round(wa.x + (wa.width - W) / 2), y: wa.y + 14, width: W, height: H, transparent: true, frame: false,
+    x: Math.round(wa.x + (wa.width - W) / 2), y: wa.y + 12, width: W, height: H, transparent: true, frame: false,
     resizable: false, movable: false, focusable: false, skipTaskbar: true, alwaysOnTop: true, hasShadow: false,
     fullscreenable: false, show: false, title: "",
     webPreferences: { preload: path.join(__dirname, "preload-ui.js"), backgroundThrottling: false },
@@ -156,43 +170,46 @@ function createOverlays() {
 function call(win, js) {
   if (win && !win.isDestroyed()) win.webContents.executeJavaScript(js).catch(() => {});
 }
-
-const work = { on: false, steps: 0, minimized: false, last: 0, hideTimer: null };
-function workStart(text) {
-  work.last = Date.now();
-  if (!work.on) {
-    log("work start:", text || "");
-    work.on = true;
-    work.steps = 0;
-    work.minimized = false;
-    clearTimeout(work.hideTimer);
-    overlays.forEach(w => { w.showInactive(); call(w, "setOn(true)"); });
-    pill.showInactive();
-    // Okno s chatem nesmí Aiko překážet (klikala by do sebe) – na dobu práce se schová dolů
-    if (main && main.isFocused()) setTimeout(() => {
-      if (work.on && main && !main.isMinimized()) { main.minimize(); work.minimized = true; }
-    }, 250);
-  }
-  call(pill, `setPill("work", ${JSON.stringify(text || "Pracuji na počítači…")})`);
+function whenLoaded(win, fn) {
+  if (!win || win.isDestroyed()) return;
+  if (win.webContents.isLoading()) win.webContents.once("did-finish-load", fn); else fn();
 }
-function workEnd(text) {
+
+const work = { on: false, screen: false, minimized: false, last: 0, hideTimer: null };
+function workStart(text, isScreen) {
+  ensureOverlays();
+  work.last = Date.now();
+  clearTimeout(work.hideTimer);
+  if (!work.on) {
+    work.on = true;
+    work.minimized = false;
+    overlays.forEach(w => { w.showInactive(); whenLoaded(w, () => call(w, "setOn(true)")); });
+    pill.showInactive();
+  }
+  // Při klikání po obrazovce se okno s chatem uhne (jinak by Aiko klikala do sebe)
+  if (isScreen && !work.screen) {
+    work.screen = true;
+    if (main && !main.isMinimized() && main.isVisible()) setTimeout(() => {
+      if (work.on && main && !main.isMinimized()) { main.minimize(); work.minimized = true; }
+    }, 200);
+  }
+  whenLoaded(pill, () => call(pill, `setPill("work", ${JSON.stringify(text || "Pracuji…")})`));
+}
+function workEnd() {
   if (!work.on) return;
-  log("work end:", text || "", "steps", work.steps);
   work.on = false;
   overlays.forEach(w => call(w, "setOn(false)"));
-  call(pill, `setPill("done", ${JSON.stringify(text || "Hotovo.")})`);
-  clearTimeout(work.hideTimer);
+  call(pill, `setPill("done", "Hotovo")`);
   work.hideTimer = setTimeout(() => {
-    overlays.forEach(w => w.hide());
-    if (!work.on) pill.hide();
-  }, 7000);
-  setTimeout(() => { if (!work.on) overlays.forEach(w => w.hide()); }, 900);
-  if (main && work.minimized) {
-    if (work.steps === 0) main.showInactive();      // krátká práce (recept) – chat zase ukázat
-    else main.flashFrame(true);                     // Aiko klikala – její výsledek nepřekrývat, jen bliknout
-  }
+    overlays.forEach(w => !w.isDestroyed() && w.hide());
+    call(pill, "hidePill()");
+    setTimeout(() => { if (!work.on && pill && !pill.isDestroyed()) pill.hide(); }, 400);
+  }, 2200);
+  if (main && work.minimized) main.showInactive();
+  work.screen = false;
+  work.minimized = false;
 }
-setInterval(() => { if (work.on && Date.now() - work.last > 180000) workEnd("Hotovo."); }, 5000);
+setInterval(() => { if (work.on && Date.now() - work.last > 300000) workEnd(); }, 5000);
 
 ipcMain.on("pill:open", () => showMain());
 ipcMain.on("pill:stop", async () => {
@@ -200,18 +217,15 @@ ipcMain.on("pill:stop", async () => {
   catch (e) { log("stop", e); }
 });
 
-// Události ze serveru (stejné, jaké dostává chat): z nich se pozná, kdy Aiko na počítači pracuje
+// Události ze serveru (stejné, jaké dostávají okna s chatem)
 function listen() {
   let ws;
   try { ws = new WebSocket(`ws://127.0.0.1:${PORT}/ws/ui`); } catch (e) { log("ws", e); return setTimeout(listen, 3000); }
   ws.onmessage = ev => {
     let m;
     try { m = JSON.parse(ev.data); } catch { return; }
-    if (m.type === "reply" && m.reply) {
-      if (m.reply.screen === "pracuje") workStart(m.reply.say);
-      else if (work.on) workEnd(m.reply.say);
-    } else if (m.type === "say" && m.working) workStart(m.text);
-    else if (m.type === "agent") { work.steps++; workStart(`Krok ${m.step}: ${m.action}`); }
+    if (m.type === "work") { if (m.on) workStart(m.text, m.screen); else workEnd(); }
+    else if (m.type === "chat.end" && work.on) workEnd();
   };
   ws.onclose = () => { if (!quitting) setTimeout(listen, 2000); };
   ws.onerror = () => {};
@@ -220,7 +234,6 @@ function listen() {
 // ---------- start / konec ----------
 app.whenReady().then(async () => {
   createMain();
-  createOverlays();
   const ready = await startEverything();
   if (!ready || !main) return;
   status("Hotovo");
