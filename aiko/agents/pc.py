@@ -832,7 +832,8 @@ class PcAgent(DeviceAgent):
             raise ValueError("chybí cíl: element nebo x,y (0–1000)")
         if a == "type" and ((el and el.password) or looks_like_code(text)):
             raise ToolRefused("Hesla a ověřovací kódy Jiřík nepíše – zadejte je prosím sami.")
-        if a == "key" and re.sub(r"\s+", "", keys.lower()) in ("win+l", "ctrl+alt+del", "ctrl+alt+delete"):
+        if a == "key" and (is_forbidden_key(keys) or re.sub(r"\s+", "", keys.lower()) in (
+                "win+l", "ctrl+alt+del", "ctrl+alt+delete")):
             raise ToolRefused("Zamknutí počítače Jiřík nepoužívá – už by se nedostal zpátky.")
         if self.dry_run:
             return {"dry_run": True, "action": a}
@@ -862,7 +863,7 @@ class PcAgent(DeviceAgent):
                 time.sleep(0.25)
             pc_gui.type_text(text)
         elif a == "key":
-            for k in (keys or "").split():
+            for k in _key_presses(keys):
                 pc_gui.press(k)
                 time.sleep(0.06)
         elif a in ("mouse_down", "mouse_up"):
@@ -909,18 +910,29 @@ class PcAgent(DeviceAgent):
         t = str(target or "").strip().strip('"')
         if not t:
             raise ValueError("chybí co otevřít")
-        if re.match(r"^(https?://|www\.)|^[\w-]+(\.[\w-]+)+(/\S*)?$", t, re.I) and not os.path.exists(t):
+        explicit_web = bool(re.match(r"^(https?://|www\.)", t, re.I))
+        p = Path(os.path.expandvars(os.path.expanduser(t)))
+        if not explicit_web and p.exists():
+            if not self.dry_run:
+                os.startfile(str(p))  # type: ignore[attr-defined]
+            return {"opened": str(p), "kind": "folder" if p.is_dir() else "file"}
+        if explicit_web or _is_web_domain(t):
             url = t if t.lower().startswith("http") else "https://" + t
             if is_blocked_url(url):
                 raise ToolRefused("Tuhle stránku Aiko neotevírá.")
             if not self.dry_run:
                 webbrowser.open(url, new=2)
             return {"opened": url, "kind": "web"}
-        p = Path(os.path.expandvars(os.path.expanduser(t)))
-        if p.exists():
-            if not self.dry_run:
-                os.startfile(str(p))  # type: ignore[attr-defined]
-            return {"opened": str(p), "kind": "folder" if p.is_dir() else "file"}
+        if _NON_WEB_EXT and Path(t).suffix.lower() in _NON_WEB_EXT and not any(sep in t for sep in ("/", "\\")):
+            if Path(t).suffix.lower() not in pc_files.EXECUTABLE:
+                match = self._find_user_file(t)
+                if match is not None:
+                    if not self.dry_run:
+                        os.startfile(str(match))  # type: ignore[attr-defined]
+                    return {"opened": str(match), "kind": "folder" if match.is_dir() else "file"}
+                return {"opened": "", "error": f"„{t}“ jsem nenašla", "similar_apps": []}
+        if forbidden_app(t):
+            raise ToolRefused(f"Aplikaci „{t}“ Aiko nespouští.")
         r = self.start_app(t)
         if r.get("started") or r.get("dry_run"):
             return {"opened": r.get("app", t), "kind": "app", "window": r.get("window", "")}
@@ -929,6 +941,22 @@ class PcAgent(DeviceAgent):
                 subprocess.Popen([shutil.which(t)], creationflags=getattr(subprocess, "DETACHED_PROCESS", 0))
             return {"opened": t, "kind": "program"}
         return {"opened": "", "error": f"„{t}“ jsem nenašla", "similar_apps": r.get("candidates", [])}
+
+    def _find_user_file(self, filename: str) -> Any:
+        try:
+            folders = self._folders()
+            hits = pc_files.find_files(filename, folders, limit=10).get("files") or []
+        except (pc_files.FileToolError, OSError):
+            return None
+        want = filename.lower()
+        exact = [h for h in hits if str(h.get("name", "")).lower() == want]
+        picked = exact[0] if exact else (hits[0] if len(hits) == 1 else None)
+        if not picked or not picked.get("where"):
+            return None
+        try:
+            return pc_files.openable(pc_files.resolve(picked["where"], folders) / picked["name"], folders)
+        except pc_files.FileToolError:
+            return None
 
     @tool("Stiskne klávesu nebo zkratku v aktivním okně (např. „ctrl+c“, „enter“, „volumeup“, „playpause“, "
           "„win+d“), nebo napíše text (text=…).")
@@ -940,7 +968,7 @@ class PcAgent(DeviceAgent):
         if keys:
             if is_forbidden_key(keys):
                 raise ToolRefused("Tuhle zkratku Aiko nepoužívá.")
-            for k in str(keys).split():
+            for k in _key_presses(keys):
                 pc_gui.press(k)
                 time.sleep(0.08)
         return {"done": True, "window": pc_gui.foreground_title()}
@@ -962,6 +990,27 @@ class PcAgent(DeviceAgent):
         code, out = run(args, timeout=30)
         return {"code": code, "output": out[-8000:]}
 
+
+
+_NON_WEB_EXT = (frozenset().union(*pc_files.KINDS.values()) | pc_files.EXECUTABLE
+                | {".md", ".log", ".ini", ".cfg", ".conf", ".json", ".toml", ".yaml", ".yml", ".xml",
+                   ".py", ".ts", ".svg", ".ico"})
+
+
+def _is_web_domain(target: str) -> bool:
+    """Rozliší doménu (seznam.cz, example.com/a) od jména místního souboru (dopis.docx)."""
+    from pathlib import Path
+
+    if not re.match(r"^[\w-]+(\.[\w-]+)+(/\S*)?$", target, re.I):
+        return False
+    if "/" in target:
+        return True
+    return Path(target).suffix.lower() not in _NON_WEB_EXT
+
+
+def _key_presses(keys: str) -> list[str]:
+    """Rozdělí posloupnost zkratek tak, aby „ctrl + c“ zůstalo jedna kombinace."""
+    return re.sub(r"\s*\+\s*", "+", str(keys or "").strip()).split()
 
 
 # Pojistka proti nevratným škodám. Model je malý a čte i texty z webu – jeden špatný příkaz nesmí

@@ -43,10 +43,10 @@ v RAM (~9 tokenů/s). Ultra je na takový počítač příliš velká.
 
 ## Instalace (od nuly)
 
-1. Stáhni si [poslední verzi](../../releases/latest) a rozbal ji.
-2. Dvojklik na **`Setup.bat`**. Samo doinstaluje, co chybí – Python, Node.js, Ollamu (přes winget), knihovny,
+1. Stáhni si [poslední verzi](../../releases/latest) (`Jirik-v2.0.0-win.zip`) a rozbal ji.
+2. Dvojklik na **`Setup.bat`** (nebo rovnou **`Jirik.bat`**). Samo doinstaluje, co chybí – Python, Node.js, Ollamu (přes winget), knihovny,
    hlas, model pro úroveň Nízká – a vytvoří na ploše ikonu **Jiřík**.
-3. Spusť Jiříka ikonou na ploše. Když instalace ještě neproběhla, aplikace ji při prvním spuštění spustí sama.
+3. Spusť Jiříka ikonou **Jiřík** na ploše nebo přes **`Jirik.bat`** ve složce. Když instalace ještě neproběhla, aplikace ji při prvním spuštění spustí sama.
 
 Požadavky: Windows 10/11, 16 GB RAM doporučeno, grafika NVIDIA výhodou (bez ní to jde, jen pomaleji),
 asi 15 GB volného místa. Záložní spuštění bez aplikace (chat v prohlížeči): `Start Jirik.bat`.

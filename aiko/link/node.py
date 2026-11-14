@@ -67,12 +67,12 @@ class Node:
         env = {**os.environ, "AIKO_TOKEN": self.token, "AIKO_PIN": self.pin, "PYTHONUTF8": "1",
                "AIKO_IDLE_EXIT": str(IDLE_EXIT)}
         LOG.mkdir(exist_ok=True)
-        out = open(LOG / "agent.log", "a", encoding="utf-8")
-        self.proc = subprocess.Popen(
-            [str(py), "-m", "aiko.agents.pc", "--server", f"wss://{host}:{self.port}/ws/device",
-             "--id", self.nid, "--name", self.name],
-            cwd=HOME, env=env, stdout=out, stderr=out,
-            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        with open(LOG / "agent.log", "a", encoding="utf-8") as out:
+            self.proc = subprocess.Popen(
+                [str(py), "-m", "aiko.agents.pc", "--server", f"wss://{host}:{self.port}/ws/device",
+                 "--id", self.nid, "--name", self.name],
+                cwd=HOME, env=env, stdout=out, stderr=out,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
         self.proc_host = host
         log("wake from", host, "→ agent pid", self.proc.pid)
 

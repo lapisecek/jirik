@@ -47,6 +47,9 @@ def main() -> int:
                 print("[!] Server se nespustil – chyba je vypsaná výše.")
                 return 1
             time.sleep(0.5)
+        else:
+            print("[!] Server Jiříka neodpověděl včas.")
+            return 1
         procs.append(subprocess.Popen([py, "-m", "aiko.agents.pc", "--server", f"ws://127.0.0.1:{PORT}/ws/device",
                                        "--name", "Tento počítač"], cwd=HERE, env=env))
         time.sleep(1.5)

@@ -4,6 +4,7 @@ node_modules/
 *.egg-info/
 __pycache__/
 *.pyc
+.pytest_cache/
 
 # data běhu: logy, historie agenta, paměť, cache
 data/

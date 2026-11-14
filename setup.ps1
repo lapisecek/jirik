@@ -71,7 +71,7 @@ $env:OLLAMA_FLASH_ATTENTION = "1"; $env:OLLAMA_KV_CACHE_TYPE = "q8_0"
 Step 2 "Knihovny (první instalace trvá pár minut)"
 if (-not (Test-Path ".venv\Scripts\python.exe")) { & $py -m venv .venv; if ($LASTEXITCODE) { Fail "Prostředí Pythonu nejde vytvořit." } }
 Retry { & .venv\Scripts\python.exe -m pip install --disable-pip-version-check --upgrade pip --quiet } "aktualizace pip"
-Retry { & .venv\Scripts\python.exe -m pip install --disable-pip-version-check -e ".[pc]" --quiet } "instalace knihoven"
+Retry { & .venv\Scripts\python.exe -m pip install --disable-pip-version-check --prefer-binary -e ".[pc]" --quiet } "instalace knihoven"
 
 # 3) Hlas
 Step 3 "Hlas Jirka"

@@ -38,7 +38,9 @@ class Voice:
         if not (self.cfg.piper_model and Path(self.cfg.piper_model).exists()):
             return False
         try:
-            import piper  # noqa: F401  # pyflakes: ignore
+            import importlib
+
+            importlib.import_module("piper")
         except ImportError:
             return False
         return True

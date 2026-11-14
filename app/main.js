@@ -20,7 +20,8 @@ const children = {};
 let quitting = false;
 
 app.setAppUserModelId("cz.jirik.local");
-if (!app.requestSingleInstanceLock()) app.quit();
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) app.quit();
 app.on("second-instance", () => showMain());
 
 // ---------- pomocné ----------
@@ -73,15 +74,27 @@ function startPc() {
   startPython("pc", ["-m", "aiko.agents.pc", "--server", `ws://127.0.0.1:${PORT}/ws/device`, "--name", "Tento počítač"]);
 }
 
+async function runFirstSetup() {
+  await new Promise(resolve => {
+    let done = false;
+    const finish = () => { if (!done) { done = true; resolve(); } };
+    const timer = setTimeout(finish, 3600 * 1000);
+    try {
+      const p = spawn("cmd.exe", [
+        "/c", "start", "Jiřík – instalace", "/wait", "powershell", "-NoProfile", "-ExecutionPolicy", "Bypass",
+        "-File", path.join(ROOT, "setup.ps1"),
+      ], { cwd: ROOT, stdio: "ignore", windowsHide: true });
+      p.once("exit", () => { clearTimeout(timer); finish(); });
+      p.once("error", e => { log("setup", e); clearTimeout(timer); finish(); });
+    } catch (e) { log("setup", e); clearTimeout(timer); finish(); }
+  });
+}
+
 async function startEverything() {
   if (!fs.existsSync(PY)) {
     // první spuštění: instalace se otevře sama v okně a aplikace počká, až doběhne
     status("První spuštění – instaluji vše potřebné (otevřelo se okno instalace)…");
-    try {
-      spawn("cmd.exe", ["/c", "start", "Jiřík – instalace", "/wait", "powershell", "-NoProfile", "-ExecutionPolicy", "Bypass",
-                        "-File", path.join(ROOT, "setup.ps1")], { cwd: ROOT, detached: true, stdio: "ignore" }).unref();
-    } catch (e) { log("setup", e); }
-    for (let i = 0; i < 3600 && !fs.existsSync(path.join(ROOT, "voices", "cs_CZ-jirka-medium.onnx.json")); i++) await sleep(1000);
+    await runFirstSetup();
     if (!fs.existsSync(PY)) { status("Instalace se nedokončila. Spusťte Setup.bat ve složce Jiříka.", true); return false; }
     status("Instalace hotová – spouštím…");
   }
@@ -104,6 +117,7 @@ async function startEverything() {
       if (i === 60) status("Ještě chvilku – první start trvá déle…");
       await sleep(500);
     }
+    if (!(await ok(`${URL}/api/hello`))) { status("Server Jiříka neodpovídá.", true); return false; }
   }
   const st = await json(`${URL}/api/state`);
   if (!(st && (st.devices || []).some(d => !d.remote && d.online))) startPc();
@@ -121,7 +135,11 @@ function createMain() {
   });
   main.setMenuBarVisibility(false);
   main.once("ready-to-show", () => main.show());
-  main.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: "deny" }; });
+  main.webContents.setWindowOpenHandler(({ url }) => {
+    try { const u = new URL(url); if (u.protocol === "http:" || u.protocol === "https:") shell.openExternal(url); }
+    catch { /* neplatná adresa */ }
+    return { action: "deny" };
+  });
   main.on("closed", () => { main = null; app.quit(); });
   main.loadFile(path.join(__dirname, "splash.html"));
   nativeTheme.on("updated", () => {
@@ -205,7 +223,10 @@ function workEnd() {
     call(pill, "hidePill()");
     setTimeout(() => { if (!work.on && pill && !pill.isDestroyed()) pill.hide(); }, 400);
   }, 2200);
-  if (main && work.minimized) main.showInactive();
+  if (main && work.minimized) {
+    if (main.isMinimized()) main.restore();
+    main.showInactive();
+  }
   work.screen = false;
   work.minimized = false;
 }
@@ -232,14 +253,16 @@ function listen() {
 }
 
 // ---------- start / konec ----------
-app.whenReady().then(async () => {
-  createMain();
-  const ready = await startEverything();
-  if (!ready || !main) return;
-  status("Hotovo");
-  listen();
-  main.loadURL(URL);
-});
+if (gotLock) {
+  app.whenReady().then(async () => {
+    createMain();
+    const ready = await startEverything();
+    if (!ready || !main) return;
+    status("Hotovo");
+    listen();
+    main.loadURL(URL);
+  });
+}
 app.on("before-quit", () => {
   quitting = true;
   for (const p of Object.values(children)) { try { p.kill(); } catch { /* už neběží */ } }

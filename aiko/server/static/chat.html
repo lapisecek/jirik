@@ -1153,7 +1153,10 @@ let wzTimer = null;
 function openWizard() { $("wizard").classList.add("show"); renderWizard(); }
 function closeWizard() {
   $("wizard").classList.remove("show");
-  if (S.pairing && ["waiting", "code"].includes(S.pairing.state)) api("/api/link/pair/close").catch(() => {});
+  if (S.pairing) {
+    if (!["waiting", "code"].includes(S.pairing.state)) S.pairing = null;
+    api("/api/link/pair/close").catch(() => {});
+  }
 }
 $("wzClose").onclick = closeWizard;
 $("wizard").querySelector(".bg").onclick = closeWizard;
@@ -1205,7 +1208,7 @@ $("wzBody").addEventListener("click", async e => {
   const b = e.target.closest("[data-wz]"); if (!b) return;
   const a = b.dataset.wz;
   if (a === "close") return closeWizard();
-  if (a === "finish") { $("wizard").classList.remove("show"); S.pairing = null; return; }
+  if (a === "finish") { $("wizard").classList.remove("show"); S.pairing = null; api("/api/link/pair/close").catch(() => {}); return; }
   if (a === "open") {
     b.disabled = true;
     const r = await api("/api/link/pair/open").catch(() => ({ ok: false, error: "Server neodpovídá." }));

@@ -81,6 +81,11 @@ def load_config(path: str | os.PathLike | None = None) -> Config:
         v = raw.get("voice", {})
         cfg.piper_model = v.get("piper_model", cfg.piper_model)
         cfg.speech_rate = float(v.get("speech_rate", cfg.speech_rate))
+        base = p.resolve().parent
+        if not cfg.data_dir.is_absolute():
+            cfg.data_dir = base / cfg.data_dir
+        if cfg.piper_model and not Path(cfg.piper_model).is_absolute():
+            cfg.piper_model = str(base / cfg.piper_model)
         lk = raw.get("link", {})
         cfg.link_port = int(lk.get("port", cfg.link_port))
         cfg.link_udp_port = int(lk.get("udp_port", cfg.link_udp_port))

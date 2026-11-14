@@ -114,6 +114,7 @@ class Pairing:
         self.node_pub = b""
         self.result: dict[str, Any] | None = None
         self.node_id = ""
+        self.done_at = 0.0
 
     @property
     def pub(self) -> bytes:
@@ -442,7 +443,9 @@ class Link:
     # --- párování ------------------------------------------------------------------------------
     def pair_public(self) -> dict[str, Any] | None:
         p = self.pairing
-        if not p:
+        if not p or p.state == "closed" or (p.done_at and time.time() - p.done_at > 60):
+            if p and p.done_at and time.time() - p.done_at > 60:
+                self.pairing = None
             return None
         return {"sid": p.sid, "state": p.state, "host": p.host, "code": p.code, "node_id": p.node_id,
                 "urls": [f"http://{ip}:{self.cfg.pair_port}/j/{p.sid}" for ip in local_ips()],
@@ -569,6 +572,7 @@ class Link:
             if p.state == "confirmed" and p.result:
                 res = json.dumps(p.result).encode()
                 p.state = "done"
+                p.done_at = time.time()
                 await self._pair_event()
                 asyncio.get_running_loop().call_later(2, lambda: asyncio.ensure_future(self.close_pairing()))
                 return 200, "application/json", res, {}
@@ -640,7 +644,8 @@ def open_firewall(cfg: Config) -> None:
             f"New-NetFirewallRule -DisplayName 'Jirik Link' -Direction Inbound -Protocol TCP "
             f"-LocalPort {int(cfg.link_port)},{int(cfg.pair_port)} -RemoteAddress LocalSubnet "
             "-Profile Private,Domain -Action Allow")
+    encoded = base64.b64encode(rule.encode("utf-16le")).decode("ascii")
     subprocess.Popen(["powershell", "-NoProfile", "-WindowStyle", "Hidden", "-Command",
                       "Start-Process powershell -Verb RunAs -WindowStyle Hidden -ArgumentList "
-                      f"'-NoProfile','-Command',\"{rule}\""],
+                      f"'-NoProfile','-EncodedCommand','{encoded}'"],
                      creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))

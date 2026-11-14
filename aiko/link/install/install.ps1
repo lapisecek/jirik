@@ -54,7 +54,7 @@ if (-not (Test-Path "$dst\.venv\Scripts\python.exe")) { & $py -m venv "$dst\.ven
 $vpy = "$dst\.venv\Scripts\python.exe"
 & $vpy -m pip install --disable-pip-version-check -q --upgrade pip 2>$null | Out-Null
 for ($i = 1; $i -le 3; $i++) {
-  & $vpy -m pip install --disable-pip-version-check -q -r "$dst\requirements.txt"
+  & $vpy -m pip install --disable-pip-version-check --prefer-binary -q -r "$dst\requirements.txt"
   if ($LASTEXITCODE -eq 0) { break }
   if ($i -eq 3) { Fail 'Instalace knihoven selhala (je počítač připojený k internetu?).' }
   Start-Sleep 3

@@ -241,11 +241,25 @@ class Chat:
         except (OSError, ValueError):
             pass
 
+    def _trimmed_history(self, keep: int = 60, cap: int = 200) -> list[dict[str, Any]]:
+        """Ořízne historii na hranici tahu (od role 'user'), aby dlouhý tah s nástroji nerozbil kontext."""
+        if len(self.history) <= keep:
+            start = 0
+        else:
+            start = len(self.history) - keep
+            while start > 0 and self.history[start].get("role") != "user":
+                start -= 1
+            if len(self.history) - start > cap:
+                start = len(self.history) - cap
+                while start < len(self.history) and self.history[start].get("role") != "user":
+                    start += 1
+        return [{k: v for k, v in h.items() if k != "images"} for h in self.history[start:]]
+
     def _save(self) -> None:
         try:
             self.path.parent.mkdir(parents=True, exist_ok=True)
             tmp = self.path.with_suffix(".tmp")
-            hist = [{k: v for k, v in h.items() if k != "images"} for h in self.history[-60:]]
+            hist = self._trimmed_history()
             tmp.write_text(json.dumps({"messages": self.messages[-200:], "history": hist}, ensure_ascii=False),
                            encoding="utf-8")
             tmp.replace(self.path)
@@ -307,7 +321,8 @@ class Chat:
     # --- vstupy ---------------------------------------------------------------------------------
     async def send(self, text: str, images: list[str] | None = None, target: str = "") -> str:
         text = (text or "").strip()
-        images = [i for i in (images or []) if isinstance(i, str)][:4]
+        images = [i.split(",", 1)[1] if i.startswith("data:") and "," in i else i
+                  for i in (images or []) if isinstance(i, str)][:4]
         if not text and not images:
             return ""
         if self.busy:
@@ -347,6 +362,28 @@ class Chat:
         self._save()
         await self.emit({"type": "chat.clear"})
 
+    def _close_incomplete_turn(self, msg: dict[str, Any], note: str, drop_empty_user: bool = False) -> None:
+        if not self.history:
+            return
+        trailing_tools = 0
+        idx = len(self.history) - 1
+        while idx >= 0 and self.history[idx].get("role") == "tool":
+            trailing_tools += 1
+            idx -= 1
+        head = self.history[idx] if idx >= 0 else {}
+        if head.get("role") == "assistant" and head.get("tool_calls"):
+            for call in head["tool_calls"][trailing_tools:]:
+                self.history.append({"role": "tool", "tool_name": (call.get("function") or {}).get("name", ""),
+                                     "content": note})
+            self.history.append({"role": "assistant", "content": ((msg.get("text") or "") + f" {note}").strip()})
+        elif self.history[-1].get("role") == "tool":
+            self.history.append({"role": "assistant", "content": ((msg.get("text") or "") + f" {note}").strip()})
+        elif self.history[-1].get("role") == "user":
+            if drop_empty_user and not (msg.get("text") or "").strip():
+                self.history.pop()
+            else:
+                self.history.append({"role": "assistant", "content": ((msg.get("text") or "") + f" {note}").strip()})
+
     # --- jedna odpověď ------------------------------------------------------------------------------
     async def _turn(self, msg: dict[str, Any]) -> None:
         mid = msg["id"]
@@ -356,16 +393,11 @@ class Chat:
             self.speaker.feed(mid, "", final=True)
         except asyncio.CancelledError:
             msg["stopped"] = True
-            last = self.history[-1] if self.history else {}
-            if last.get("role") == "assistant" and last.get("tool_calls"):
-                for call in last["tool_calls"]:
-                    self.history.append({"role": "tool", "tool_name": (call.get("function") or {}).get("name", ""),
-                                         "content": "(stopped by the user)"})
-            elif last.get("role") in ("user", "tool"):
-                self.history.append({"role": "assistant", "content": msg["text"] + " (stopped by the user)"})
+            self._close_incomplete_turn(msg, "(stopped by the user)")
         except Exception as e:  # noqa: BLE001
             log.exception("Odpověď selhala")
             msg["error"] = self._explain(e)
+            self._close_incomplete_turn(msg, "(failed)", drop_empty_user=True)
         finally:
             for t in msg["tools"]:
                 if t["state"] == "run":
@@ -386,9 +418,12 @@ class Chat:
             return "Ollama neběží. Spusťte ji a zkuste to znovu."
         if isinstance(e, httpx.HTTPStatusError) and e.response.status_code == 404:
             return f"Model {self.model} není stažený – stáhněte ho v nabídce Myšlení."
-        if isinstance(e, httpx.ReadTimeout):
+        if isinstance(e, httpx.TimeoutException):
             return "Model neodpověděl včas. Zkuste nižší úroveň myšlení."
-        return f"Něco se pokazilo: {e}"
+        if isinstance(e, (httpx.ReadError, httpx.RemoteProtocolError, httpx.TransportError)):
+            return "Spojení s modelem (Ollama) se přerušilo. Zkuste to znovu."
+        detail = str(e).strip() or type(e).__name__
+        return f"Něco se pokazilo: {detail}"
 
     def computers(self) -> list[str]:
         local = "Tento počítač"
