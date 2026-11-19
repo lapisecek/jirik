@@ -33,7 +33,7 @@ import httpx
 from ..common.safety import (AGENT_FORBIDDEN_TOOLS, Level, is_risky_label, looks_like_code, redact_codes,
                              tool_level)
 from . import webtools
-from .agent_memory import AgentMemory, RunRecorder
+from .agent_memory import AgentMemory, RunRecorder, est_tokens
 from .config import Config
 from .registry import Device, DeviceError, Registry
 
@@ -159,14 +159,6 @@ class Vlm:
         return None
 
 
-def est_tokens(text: str) -> int:
-    """Hrubý odhad tokenů pro Qwen: každá číslice je samostatný token (souřadnice prvků jsou drahé!),
-    čeština s diakritikou ~2,8 znaku na token. Dřív len/3 – podhodnocené, varování se neozvalo, a přitom
-    prompt s 100 prvky „[295, 262, 320, 288]“ přetekl kontext 8192 a Ollama usekla pravidla i odpověď."""
-    digits = sum(c.isdigit() for c in text)
-    return digits + (len(text) - digits) * 10 // 28 + 1
-
-
 class ClaudeVlm(Vlm):
     name = "claude"
 
@@ -229,7 +221,7 @@ _POS_LINE = re.compile(r"^(  \[\d+\] .*) @(\d+),(\d+)$", re.M)
 class OllamaVlm(Vlm):
     """Lokální Vision model přes Ollamu (doporučený qwen3-vl:8b-instruct, na 4 GB VRAM qwen3-vl:2b-instruct)."""
 
-    MAX_CTX = 32768
+    MAX_CTX = 65536
     OUTPUT_RESERVE = 900            # tokeny na odpověď (jedna akce je krátký JSON) + rezerva odhadu
 
     def __init__(self, url: str, model: str, timeout: float = 600, max_pixels: int = 1_000_000,
@@ -249,15 +241,13 @@ class OllamaVlm(Vlm):
         return max(1500, self.num_ctx - est_tokens(system) - self._image_tokens() - self.OUTPUT_RESERVE - extra)
 
     def _grow_ctx(self, need: int) -> bool:
-        new = min(self.MAX_CTX, max(self.num_ctx * 2, (need // 4096 + 1) * 4096))
+        cap = int(self.cfg.num_ctx) if self.cfg is not None else self.MAX_CTX
+        new = min(max(cap, self.num_ctx), self.MAX_CTX, max(self.num_ctx * 2, (need // 4096 + 1) * 4096))
         if new <= self.num_ctx:
             return False
-        log.warning("Prompt pro %s (~%d tokenů) se nevejde do kontextu %d – zvyšuji na %d. Natrvalo: "
-                    "[vlm] ollama_num_ctx = %d (víc paměti grafiky; pomůže i OLLAMA_KV_CACHE_TYPE=q8_0)",
-                    self.model, need, self.num_ctx, new, new)
+        log.warning("Prompt pro %s (~%d tokenů) se nevejde do kontextu %d – zvyšuji na %d.",
+                    self.model, need, self.num_ctx, new)
         self.num_ctx = new
-        if self.cfg is not None:            # stejný kontext i pro porozumění větám → Ollama model nepřenačítá
-            self.cfg.ollama_vlm_num_ctx = new
         return True
 
     def _to_relative(self, text: str, size: tuple[int, int]) -> str:
@@ -629,7 +619,9 @@ class GuiAgent:
             except OSError as e:
                 log.warning("Historii agenta nejde založit: %s", e)
         if s.experience is None:
-            s.experience = AgentMemory.as_prompt(self.memory.recall(s.task, s.device.kind)) if self.memory else ""
+            exp_budget = max(120, getattr(self.vlm, "num_ctx", 8192) // 16)
+            s.experience = (AgentMemory.as_prompt(self.memory.recall(s.task, s.device.kind), max_tokens=exp_budget)
+                            if self.memory else "")
             if s.experience:
                 log.info("Agent: mám zkušenost z podobných úkolů:\n%s", s.experience)
         if s.system_info is None:

@@ -111,6 +111,17 @@ header.scrolled { border-bottom-color: var(--line); }
 .status { display: flex; align-items: center; gap: 8px; font: 12px/1 var(--mono); color: var(--mute);
           padding: 0 8px; height: 30px; white-space: nowrap; min-width: 0; overflow: hidden; }
 .status .txt { overflow: hidden; text-overflow: ellipsis; }
+.ctx-pill { height: 28px; padding: 0 9px; border-radius: 999px; background: var(--sunk); border: 1px solid var(--line);
+            display: inline-flex; align-items: center; gap: 7px; font: 11.5px/1 var(--mono); color: var(--ink-2);
+            transition: background-color .18s, border-color .18s, transform .25s var(--spring); flex: none; }
+.ctx-pill:hover { background: var(--surface); border-color: var(--line-2); color: var(--ink); }
+.ctx-pill:active { transform: scale(.95); }
+.ctx-pill .ctx-bar { width: 32px; height: 4px; border-radius: 99px; background: var(--line); overflow: hidden; flex: none; }
+.ctx-pill .ctx-bar i { display: block; height: 100%; width: 0%; background: var(--ok); border-radius: 99px;
+                       transition: width .4s var(--out), background-color .3s; }
+.ctx-pill.warn .ctx-bar i { background: var(--warn); }
+.ctx-pill.bad .ctx-bar i { background: var(--bad); }
+.ctx-pill.bad { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 35%, var(--line)); }
 .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--mute); flex: none;
        transition: background-color .4s, transform .4s var(--spring); }
 .dot.ok { background: var(--ok); } .dot.warn { background: var(--warn); } .dot.bad { background: var(--bad); }
@@ -211,12 +222,35 @@ main { position: relative; min-height: 0; }
 .tools .more:hover { color: var(--ink); background: var(--sunk); }
 
 /* plán a průběžná práce agenta */
+.plan-doc { margin-bottom: 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface);
+            box-shadow: var(--shadow); overflow: hidden; animation: slidein .45s var(--out) both; }
+.plan-doc-h { display: flex; align-items: center; gap: 9px; padding: 10px 12px 10px 14px;
+              background: color-mix(in srgb, var(--sunk) 55%, var(--surface)); cursor: pointer; user-select: none; }
+.plan-doc.open .plan-doc-h { border-bottom: 1px solid var(--line); }
+.plan-badge { font: 600 10.5px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase;
+              background: var(--accent-soft); color: var(--accent); padding: 4px 7px; border-radius: 6px; flex: none; }
+.plan-doc-t { flex: 1; min-width: 0; font: 600 14.5px/1.3 var(--display); color: var(--ink);
+              overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plan-doc-acts { display: flex; align-items: center; gap: 2px; flex: none; }
+.plan-doc-acts .chev { width: 15px; height: 15px; transition: transform .35s var(--spring); }
+.plan-doc.open .plan-doc-acts .chev { transform: rotate(90deg); }
+.plan-doc-b { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .4s var(--out); }
+.plan-doc.open .plan-doc-b { grid-template-rows: 1fr; }
+.plan-doc-b > div { overflow: hidden; min-height: 0; }
+.plan-doc-sum { padding: 10px 14px; font-size: 13.5px; line-height: 1.5; color: var(--ink-2);
+                background: color-mix(in srgb, var(--paper) 60%, transparent); border-bottom: 1px solid var(--line); }
+.plan-doc-md { padding: 13px 16px 15px; font-size: 14px; line-height: 1.58; }
+
 .plan { margin-bottom: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface);
         animation: slidein .4s var(--out) both; }
 .plan-h { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; font-weight: 600;
           color: var(--ink); margin-bottom: 6px; }
 .plan-h .cnt { font: 600 11px/1 var(--mono); color: var(--mute); background: var(--sunk); padding: 4px 7px; border-radius: 6px; flex: none; }
 .plan-h .cnt.done { color: var(--ok); }
+.plan-pb { height: 3px; border-radius: 99px; background: var(--sunk); overflow: hidden; margin-bottom: 8px; }
+.plan-pb i { display: block; height: 100%; background: var(--ok); border-radius: 99px; transition: width .4s var(--out); }
+.plan-sec { font: 600 10.5px/1 var(--mono); text-transform: uppercase; letter-spacing: .07em; color: var(--mute);
+            margin: 6px 0 2px; }
 .plan-list { display: flex; flex-direction: column; gap: 5px; }
 .plan-it { display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 8px; align-items: start; font-size: 13px; line-height: 1.4; }
 .plan-it .pi { width: 16px; height: 16px; margin-top: 1px; display: grid; place-items: center; }
@@ -227,6 +261,9 @@ main { position: relative; min-height: 0; }
 .plan-it.done .pt { color: var(--mute); text-decoration: line-through; }
 .plan-it.in_progress .pt { color: var(--ink); font-weight: 600; }
 .plan-it.pending .pt { color: var(--ink-2); }
+.plan-sub { margin: 4px 0 1px; padding-left: 16px; list-style: disc; font-size: 12px; line-height: 1.45; color: var(--ink-2); }
+.plan-sub li { margin: 1px 0; }
+.plan-sub li::marker { color: var(--mute); }
 .workbar { display: inline-flex; align-items: center; gap: 8px; margin-bottom: 10px; padding: 5px 10px; border-radius: 999px;
            background: var(--sunk); font: 12px/1.3 var(--mono); color: var(--ink-2); animation: fade .3s both; max-width: 100%; }
 .workbar .spin { width: 13px; height: 13px; animation: spin .9s linear infinite; color: var(--accent); flex: none; }
@@ -521,6 +558,24 @@ main { position: relative; min-height: 0; }
 .hw div { padding: 12px 14px; } .hw div + div { border-left: 1px solid var(--line); }
 .hw small { display: block; font: 10.5px/1 var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--mute); }
 .hw b { display: block; margin-top: 6px; font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ctx-meter { width: 100%; display: flex; flex-direction: column; gap: 8px; }
+.ctx-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.ctx-track { height: 7px; border-radius: 99px; background: var(--sunk); overflow: hidden; }
+.ctx-track i { display: block; height: 100%; width: 0%; background: var(--ok); border-radius: 99px;
+               transition: width .45s var(--out), background-color .3s; }
+.ctx-track.warn i { background: var(--warn); }
+.ctx-track.bad i { background: var(--bad); }
+.ctx-cfg { width: 100%; display: flex; flex-direction: column; gap: 10px; }
+.ctx-presets { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 5px; }
+.ctx-pre { height: 32px; border-radius: 9px; background: var(--sunk); font: 600 12px/1 var(--mono); color: var(--ink-2);
+           transition: background-color .15s, color .15s, transform .25s var(--spring); }
+.ctx-pre:hover { background: var(--line); color: var(--ink); }
+.ctx-pre:active { transform: scale(.95); }
+.ctx-pre.on { background: var(--ink); color: var(--paper); }
+.ctx-custom { display: flex; align-items: center; gap: 8px; }
+.ctx-custom input { width: 110px; height: 32px; border: 1px solid var(--line-2); border-radius: 9px; background: var(--paper);
+                    padding: 0 10px; font: 12.5px var(--mono); outline: 0; }
+.ctx-custom input:focus { border-color: var(--ink-2); }
 .foot { margin-top: 26px; font: 11.5px/1.7 var(--mono); color: var(--mute); }
 
 #lightbox { position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; padding: 32px; background: rgba(15,14,12,.78);
@@ -541,6 +596,7 @@ main { position: relative; min-height: 0; }
 }
 @media (max-width: 640px) {
   .log { padding: 16px 16px 32px; } .composer { padding: 0 12px 12px; } .status { display: none; }
+  .ctx-pill .ctx-bar { display: none; }
   .msg { gap: 10px; } .tabs button { padding: 0 10px; } .lvlbtn .nm, .autobtn .nm { display: none; } header { padding-left: 12px; }
   .brand .nm2 { display: none; }
 }
@@ -564,6 +620,7 @@ main { position: relative; min-height: 0; }
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="14" height="10" rx="2"/><path d="M6 18h6M9 14v4"/><rect x="17" y="8" width="5" height="10" rx="1.5"/></svg>Zařízení<span class="cnt" id="devCount" hidden>0</span></button>
     </nav>
     <div class="right">
+      <button class="ctx-pill" id="ctxPill" title="Využití kontextu – kliknutím otevřeš nastavení"><span class="ctx-txt" id="ctxTxt">0 %</span><span class="ctx-bar"><i id="ctxBar"></i></span></button>
       <div class="status" id="status"><span class="dot" id="sdot"></span><span class="txt" id="stext">…</span></div>
       <div class="sep"></div>
       <button class="iconbtn" id="voiceBtn" title="Hlas (zapnout / vypnout)">
@@ -625,6 +682,38 @@ main { position: relative; min-height: 0; }
           <button class="switch hot" id="swUnc" role="switch" aria-checked="false"></button></div>
       </div>
     </div>
+    <div class="group" id="ctxGroup">
+      <h3>Kontext a paměť</h3>
+      <div class="card">
+        <div class="item">
+          <div class="ctx-meter">
+            <div class="ctx-top">
+              <div class="t"><b>Zaplnění kontextu</b><small id="ctxDetail">0 / 8 192 tokenů · 0 %</small></div>
+              <button class="btn line sm" id="ctxCompact" title="Uvolní staré paměti a dávnou historii">Uvolnit staré</button>
+            </div>
+            <div class="ctx-track" id="ctxTrack"><i id="ctxSheetBar"></i></div>
+            <small id="ctxMemInfo">Dlouhodobé paměti: 0 · automaticky uvolní nejstarší při zaplnění</small>
+          </div>
+        </div>
+        <div class="item">
+          <div class="ctx-cfg">
+            <div class="t"><b>Velikost kontextu (num_ctx)</b><small id="ctxHint">Větší okno udrží delší historii i složité plány.</small></div>
+            <div class="ctx-presets" id="ctxPresets">
+              <button type="button" class="ctx-pre" data-ctx="4096">4k</button>
+              <button type="button" class="ctx-pre" data-ctx="8192">8k</button>
+              <button type="button" class="ctx-pre" data-ctx="16384">16k</button>
+              <button type="button" class="ctx-pre" data-ctx="32768">32k</button>
+              <button type="button" class="ctx-pre" data-ctx="65536">64k</button>
+            </div>
+            <div class="ctx-custom">
+              <input type="number" id="ctxInput" min="2048" max="65536" step="512" aria-label="Vlastní velikost kontextu">
+              <button type="button" class="btn line sm" id="ctxApply">Použít</button>
+              <small style="margin:0">2 048 – 65 536 tokenů</small>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
     <div class="group"><h3>Stažené modely</h3><div class="card" id="modelList"></div></div>
     <div class="group">
       <h3>Hlas</h3>
@@ -646,7 +735,10 @@ main { position: relative; min-height: 0; }
 "use strict";
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-const S = { settings: { voice: true, uncensored: false, level: "low", autonomous: true }, status: {}, models: { hardware: {}, levels: [], pulls: {} },
+const S = { settings: { voice: true, uncensored: false, level: "low", autonomous: true, num_ctx: 8192 }, status: {},
+            contexts: { chat: { used: 0, limit: 8192, pct: 0, memories: 0, evicted_turns: 0, evicted_memories: 0 },
+                        devices: { used: 0, limit: 8192, pct: 0, memories: 0, evicted_turns: 0, evicted_memories: 0 } },
+            models: { hardware: {}, levels: [], pulls: {} },
             devices: [], nodes: [], pairing: null, pairingPublicNet: false, pairingFirewallOk: true, voiceAvail: true, connected: false, booted: false, userName: "",
             speaking: null, tab: "chat", target: "local", pendingSelect: null };
 const LVL_IDX = { low: 1, medium: 2, smart: 3, ultra: 4 };
@@ -870,7 +962,7 @@ class View {
     if (!a) {
       a = document.createElement("article"); a.className = "msg aiko"; a.dataset.id = m.id;
       a.innerHTML = `<div class="who">${markHTML}</div><div class="body"><div class="note-slot"></div><div class="reason-slot"></div>
-        <div class="plan-slot"></div><div class="tools"></div><div class="workbar-slot"></div><div class="md"></div><div class="tail"></div>
+        <div class="plan-doc-slot"></div><div class="plan-slot"></div><div class="tools"></div><div class="workbar-slot"></div><div class="md"></div><div class="tail"></div>
         <div class="meta"><span class="lvl"></span><button class="mini speak-stop" title="Ztišit"><span class="eq"><i></i><i></i><i></i><i></i></span></button>
         <button class="mini copy-msg" title="Kopírovat odpověď">${I.copy}</button></div></div>`;
       this.log.append(a);
@@ -878,8 +970,10 @@ class View {
     const live = this.live === m.id;
     a.classList.toggle("live", live);
     a.classList.toggle("thinking", live && !!m._thinkNow);
-    set(a.querySelector(".note-slot"), m.note ? `<div class="notice">${esc(m.note)}</div>` : "");
+    const notices = [m.note, m.ctx_notice].filter(Boolean);
+    set(a.querySelector(".note-slot"), notices.length ? `<div class="notice">${notices.map(esc).join(" · ")}</div>` : "");
     this.paintReason(a, m, live);
+    this.paintDocPlan(a, m);
     this.paintPlan(a, m);
     this.paintTools(a, m);
     set(a.querySelector(".workbar-slot"), live && m.work_status ? `<div class="workbar">${I.run}<span>${esc(m.work_status)}</span></div>` : "");
@@ -915,15 +1009,54 @@ class View {
     const rt = r.querySelector(".rt");
     if (rt._len !== m.thinking.length) { rt.textContent = m.thinking; rt._len = m.thinking.length; if (now) rt.scrollTop = rt.scrollHeight; }
   }
+  paintDocPlan(a, m) {
+    const slot = a.querySelector(".plan-doc-slot"), dp = m.doc_plan;
+    if (!dp) { set(slot, ""); return; }
+    const key = `${dp.ts || ""}:${dp.title || ""}:${(dp.markdown || "").length}:${(dp.summary || "").length}`;
+    let card = slot.firstElementChild;
+    if (!card || card._key !== key) {
+      const wasOpen = card ? !!card._open : true;
+      slot.innerHTML = `<div class="plan-doc${wasOpen ? " open" : ""}">
+        <div class="plan-doc-h" role="button" tabindex="0">
+          <span class="plan-badge">Plán</span>
+          <span class="plan-doc-t">${esc(dp.title || "Plán postupu")}</span>
+          <span class="plan-doc-acts">
+            <button type="button" class="mini copy-plan" title="Kopírovat plán">${I.copy}</button>
+            <button type="button" class="mini tog-plan" title="Sbalit / rozbalit">${I.chev}</button>
+          </span>
+        </div>
+        <div class="plan-doc-b"><div>
+          ${dp.summary ? `<div class="plan-doc-sum">${esc(dp.summary)}</div>` : ""}
+          ${dp.markdown ? `<div class="plan-doc-md md">${md(dp.markdown)}</div>` : ""}
+        </div></div>
+      </div>`;
+      card = slot.firstElementChild;
+      card._key = key;
+      card._open = wasOpen;
+      slot._h = slot.innerHTML;
+      const head = card.querySelector(".plan-doc-h");
+      head.onclick = e => {
+        if (e.target.closest(".copy-plan")) return;
+        card._open = !card._open;
+        card.classList.toggle("open", card._open);
+      };
+      head.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); head.click(); } };
+    }
+  }
   paintPlan(a, m) {
     const slot = a.querySelector(".plan-slot"), p = m.plan;
     if (!p || !p.steps || !p.steps.length) { set(slot, ""); return; }
     const doneCnt = p.steps.filter(s => s.status === "done").length, total = p.steps.length;
+    const pct = Math.round((100 * doneCnt) / Math.max(1, total));
+    let lastSec = "";
     const rows = p.steps.map(s => {
+      const sec = s.section && s.section !== lastSec ? (lastSec = s.section, `<div class="plan-sec">${esc(s.section)}</div>`) : "";
       const ico = s.status === "done" ? I.done : s.status === "in_progress" ? I.run : '<span class="pend"></span>';
-      return `<div class="plan-it ${esc(s.status || "pending")}"><span class="pi">${ico}</span><span class="pt">${esc(s.title)}</span></div>`;
+      const sub = (s.items && s.items.length)
+        ? `<ul class="plan-sub">${s.items.map(it => `<li>${esc(it)}</li>`).join("")}</ul>` : "";
+      return `${sec}<div class="plan-it ${esc(s.status || "pending")}"><span class="pi">${ico}</span><div><span class="pt">${esc(s.title)}</span>${sub}</div></div>`;
     }).join("");
-    set(slot, `<div class="plan"><div class="plan-h"><span>${esc(p.goal || "Plán úkolu")}</span><span class="cnt${doneCnt === total ? " done" : ""}">${doneCnt}/${total}</span></div><div class="plan-list">${rows}</div></div>`);
+    set(slot, `<div class="plan"><div class="plan-h"><span>${esc(p.goal || "Seznam úkolů")}</span><span class="cnt${doneCnt === total ? " done" : ""}">${doneCnt}/${total}</span></div><div class="plan-pb"><i style="width:${pct}%"></i></div><div class="plan-list">${rows}</div></div>`);
   }
   paintTools(a, m) {
     const box = a.querySelector(".tools");
@@ -955,6 +1088,13 @@ class View {
     if (b.classList.contains("copy")) {
       await navigator.clipboard.writeText(b.parentElement.querySelector("code").textContent);
       b.innerHTML = I.check; setTimeout(() => (b.innerHTML = I.copy), 1400);
+    } else if (b.classList.contains("copy-plan")) {
+      e.stopPropagation();
+      const m = this.messages.get(b.closest(".msg").dataset.id);
+      const dp = m && m.doc_plan;
+      const txt = dp ? [dp.title, dp.summary, dp.markdown].filter(Boolean).join("\n\n") : "";
+      await navigator.clipboard.writeText(txt);
+      b.innerHTML = I.check; setTimeout(() => (b.innerHTML = I.copy), 1400);
     } else if (b.classList.contains("copy-msg")) {
       const m = this.messages.get(b.closest(".msg").dataset.id);
       await navigator.clipboard.writeText(m ? m.text : "");
@@ -982,6 +1122,7 @@ function setTab(tab) {
   $("wipeInfo").textContent = tab === "chat" ? "Odstraní konverzaci v záložce Chat." : "Odstraní konverzaci v záložce Zařízení.";
   try { localStorage.setItem("jirik.tab", tab); } catch {}
   if (tab === "devices") { paintDevices(); if (!$("pvImg").querySelector("img")) refreshPreview(); }
+  paintContext();
   setTimeout(() => views[tab].ta.focus(), 60);
 }
 $("tabs").onclick = e => { const b = e.target.closest("button[data-tab]"); if (b) setTab(b.dataset.tab); };
@@ -1021,8 +1162,37 @@ function paintStatus() {
   $("lvlInfo").textContent = want ? `${want.name} · ${want.active_model}${st.note ? " · zatím " + (lv ? lv.name : "") : ""}` : "…";
   $("modelInfo").innerHTML = unc ? "Bez omezení obsahu (abliterated verze stejných modelů)" : "Standardní modely Qwen3.5";
   const n = S.nodes.length; $("devCount").hidden = !n; $("devCount").textContent = n;
-  paintHardware(); paintModelList();
+  paintContext(); paintHardware(); paintModelList();
   if ($("levels").classList.contains("show")) renderLevels();
+}
+function fmtInt(n) { return Math.round(n || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " "); }
+function paintContext() {
+  const limit = Number(S.settings.num_ctx || 8192);
+  const c = Object.assign({ used: 0, limit, pct: 0, memories: 0, evicted_turns: 0, evicted_memories: 0 }, S.contexts[S.tab] || {});
+  const useLim = c.limit || limit;
+  const pct = Math.max(0, Math.min(100, c.pct ?? Math.round((100 * c.used) / Math.max(1, useLim))));
+  const stateCls = pct >= 90 ? "bad" : pct >= 70 ? "warn" : "";
+  const pill = $("ctxPill");
+  pill.className = "ctx-pill" + (stateCls ? " " + stateCls : "");
+  $("ctxTxt").textContent = pct + " %";
+  $("ctxBar").style.width = pct + "%";
+  pill.title = `Kontext (${S.tab === "chat" ? "Chat" : "Zařízení"}): ${fmtInt(c.used)} / ${fmtInt(useLim)} tokenů (${pct} %) · klikni pro nastavení`;
+  $("ctxDetail").textContent = `${fmtInt(c.used)} / ${fmtInt(useLim)} tokenů · ${pct} %`;
+  const track = $("ctxTrack");
+  track.className = "ctx-track" + (stateCls ? " " + stateCls : "");
+  $("ctxSheetBar").style.width = pct + "%";
+  const evTotal = (c.evicted_turns || 0) + (c.evicted_memories || 0);
+  $("ctxMemInfo").textContent = `Paměti: ${c.memories || 0}` +
+    (evTotal ? ` · uvolněno starých: ${c.evicted_turns || 0} tahů, ${c.evicted_memories || 0} pamětí` : " · staré se automaticky uvolní při zaplnění");
+  $("ctxPresets").querySelectorAll("[data-ctx]").forEach(b => b.classList.toggle("on", Number(b.dataset.ctx) === limit));
+  const inp = $("ctxInput");
+  if (document.activeElement !== inp) inp.value = limit;
+  const hw = S.models.hardware || {}, want = (S.models.levels || []).find(l => l.key === S.settings.level);
+  const kvEst = (limit / 8192) * ((want && want.params && want.params.startsWith("27")) ? 1.4 : 0.6);
+  const sizeGb = want ? want.download_gb : 3.4;
+  if (!hw.vram_gb) $("ctxHint").textContent = "Bez NVIDIA GPU – větší kontext zpomaluje zpracování v RAM.";
+  else if (sizeGb + kvEst <= hw.vram_gb) $("ctxHint").textContent = `Veškerý kontext se pohodlně vejde do grafiky (${num(hw.vram_gb)} GB VRAM).`;
+  else $("ctxHint").textContent = `Velký kontext (+≈${num(kvEst.toFixed(1))} GB KV paměti) může přetékat do RAM.`;
 }
 function setSwitch(sw, on, disabled) { sw.classList.toggle("on", !!on); sw.setAttribute("aria-checked", !!on); sw.disabled = !!disabled; }
 
@@ -1100,11 +1270,32 @@ $("swVoice").onclick = () => setSetting({ voice: !S.settings.voice });
 $("voiceBtn").onclick = () => setSetting({ voice: !S.settings.voice });
 $("swAuto").onclick = () => setSetting({ autonomous: !(S.settings.autonomous !== false) });
 $("swUnc").onclick = () => setSetting({ uncensored: !S.settings.uncensored });
+$("ctxPill").onclick = () => { sheet(true); setTimeout(() => $("ctxGroup")?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 220); };
+$("ctxPresets").onclick = e => { const b = e.target.closest("[data-ctx]"); if (b) setSetting({ num_ctx: Number(b.dataset.ctx) }); };
+$("ctxApply").onclick = () => {
+  const v = Math.round(Number($("ctxInput").value || 0));
+  if (!Number.isFinite(v) || v < 2048 || v > 65536) return toast("Kontext musí být mezi 2 048 a 65 536 tokeny.");
+  setSetting({ num_ctx: v });
+};
+$("ctxInput").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); $("ctxApply").click(); } });
+$("ctxCompact").onclick = async () => {
+  try {
+    const info = await api("/api/context/compact", { space: S.tab });
+    S.contexts[S.tab] = info;
+    paintContext();
+    toast(`Kontext pročištěn (${info.pct} %)`);
+  } catch { toast("Vyčištění kontextu se nepovedlo."); }
+};
 async function setSetting(ch) {
   Object.assign(S.settings, ch); paintStatus();
-  try { await api("/api/settings", ch); } catch { toast("Nastavení se nepodařilo uložit."); }
+  try {
+    const res = await api("/api/settings", ch);
+    if (res && typeof res === "object") Object.assign(S.settings, res);
+    paintStatus();
+  } catch { toast("Nastavení se nepodařilo uložit."); }
   if ("autonomous" in ch) toast(ch.autonomous ? "Autonomní práce zapnuta (dlouhé úkoly)" : "Autonomní práce vypnuta");
   if ("uncensored" in ch) toast(ch.uncensored ? "Necenzurovaný režim zapnutý" : "Standardní režim");
+  if ("num_ctx" in ch) toast(`Kontext nastaven na ${fmtInt(ch.num_ctx)} tokenů`);
   if ("level" in ch) { const l = S.models.levels.find(x => x.key === ch.level); if (l) toast(`Myšlení: ${l.name}`); }
 }
 $("wipe").onclick = async e => {
@@ -1318,7 +1509,10 @@ function onMsg(m) {
     case "snapshot":
       S.connected = true; S.settings = m.settings; S.status = m.status; S.voiceAvail = m.voice; S.devices = m.devices;
       S.nodes = m.nodes; S.pairing = m.pairing; S.userName = m.user_name || ""; S.models = { ...m.models, installed: installedFrom(m.models) };
-      for (const [k, sp] of Object.entries(m.spaces || {})) views[k].reset(sp.messages, sp.current);
+      for (const [k, sp] of Object.entries(m.spaces || {})) {
+        views[k].reset(sp.messages, sp.current);
+        if (sp.context) S.contexts[k] = sp.context;
+      }
       if (!S.booted) {
         S.booted = true; $("boot").classList.add("gone");
         let t = "chat"; try { t = localStorage.getItem("jirik.tab") || "chat"; } catch {}
@@ -1350,7 +1544,16 @@ function onMsg(m) {
       for (const vw of Object.values(views)) [prev, S.speaking].forEach(id => id && vw.messages.has(id) && vw.schedule(id));
       break;
     }
-    case "settings": S.settings = m.settings; S.status = m.status; if (m.models) S.models = { ...m.models, installed: installedFrom(m.models) }; break;
+    case "settings":
+      S.settings = m.settings; S.status = m.status;
+      if (m.contexts) Object.assign(S.contexts, m.contexts);
+      if (m.models) S.models = { ...m.models, installed: installedFrom(m.models) };
+      break;
+    case "context": {
+      const sp = m.space || (m.context && m.context.space) || "chat";
+      if (m.context) S.contexts[sp] = m.context;
+      break;
+    }
     case "devices": S.devices = m.devices; S.nodes = m.nodes; paintDevices(); break;
     case "nodes": S.nodes = m.nodes; paintDevices(); break;
     case "pairing": S.pairing = m.pairing; if ($("wizard").classList.contains("show")) renderWizard(); break;
@@ -1377,6 +1580,8 @@ function connect() {
 setInterval(async () => {
   if (!S.connected) return;
   try { const st = await (await fetch("/api/state")).json(); S.status = st.status; S.nodes = st.nodes;
+        if (st.settings) S.settings = st.settings;
+        for (const [k, sp] of Object.entries(st.spaces || {})) if (sp.context) S.contexts[k] = sp.context;
         S.models = { ...st.models, installed: installedFrom(st.models) }; paintStatus(); paintDevices(); } catch {}
 }, 20000);
 connect();

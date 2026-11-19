@@ -98,14 +98,27 @@ def test_fastapi_endpoints_and_guards(tmp_path, monkeypatch):
         assert st["type"] == "snapshot"
         assert "chat" in st["spaces"]
 
-        r = client.post("/api/settings", json={"voice": False, "level": "medium", "autonomous": False})
+        r = client.post("/api/settings", json={"voice": False, "level": "medium", "autonomous": False, "num_ctx": 16384})
         assert r.status_code == 200
         assert r.json()["voice"] is False
         assert r.json()["level"] == "medium"
         assert r.json()["autonomous"] is False
+        assert r.json()["num_ctx"] == 16384
+        assert app.state.chat.cfg.num_ctx == 16384
+        assert app.state.chat.cfg.ollama_vlm_num_ctx == 16384
         assert client.post("/api/settings", json={"autonomous": True}).json()["autonomous"] is True
 
         assert client.post("/api/settings", json={"level": "invalid"}).status_code == 400
+        assert client.post("/api/settings", json={"num_ctx": 512}).status_code == 400
+        assert client.post("/api/settings", json={"num_ctx": 200000}).status_code == 400
+
+        st2 = client.get("/api/state").json()
+        assert st2["spaces"]["chat"]["context"]["limit"] == 16384
+        assert "pct" in st2["spaces"]["chat"]["context"]
+
+        comp = client.post("/api/context/compact", json={"space": "chat"})
+        assert comp.status_code == 200
+        assert comp.json()["limit"] == 16384
 
         opened = client.post("/api/link/pair/open").json()
         assert opened["ok"] is True
@@ -116,6 +129,11 @@ def test_fastapi_endpoints_and_guards(tmp_path, monkeypatch):
         assert fw_calls == [True]
         assert client.post("/api/link/pair/close").json() == {"ok": True}
         assert app.state.link.pairing is None
+
+    # Po znovunačtení aplikace se uložené `num_ctx` automaticky obnoví
+    app2 = create_app(Config(data_dir=tmp_path, ollama_url="http://127.0.0.1:1", link_port=0, pair_port=0))
+    assert app2.state.chat.cfg.num_ctx == 16384
+    assert app2.state.chat.cfg.ollama_vlm_num_ctx == 16384
 
     assert host_allowed("127.0.0.1:8770")
     assert host_allowed("jirik.local:8770")

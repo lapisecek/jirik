@@ -239,6 +239,149 @@ def test_context_compaction_keeps_original_user_goal_on_long_tasks(tmp_path):
     assert len(ctx) < len(chat.history)
 
 
+@pytest.mark.asyncio
+async def test_old_memories_and_turns_evicted_when_context_full(tmp_path):
+    import time
+
+    chat = _chat(tmp_path)
+    chat.cfg.num_ctx = 4096
+
+    # Naplníme dlouhodobé paměti i starší běhy agenta
+    for i in range(10):
+        assert chat.memories.remember(f"Stará paměť číslo {i}: uživatel preferuje detailní poznámku č. {i} " + ("abc " * 12))
+    old_t = time.time() - 86400 * 10
+    rows = chat.memories._load()
+    for idx, r in enumerate(rows):
+        r["time"] = old_t + idx
+        r["last_used"] = old_t + idx
+    chat.memories._save(rows)
+    assert chat.memories.count() == 10
+
+    for i in range(12):
+        chat.agent_memory.remember(f"Úkol {i}", "pc", "done", "ok", [f"krok {i}"])
+    before_agent = chat.agent_memory.count()
+
+    # Naplníme historii několika starými tahy přesahujícími kontext 4096
+    for i in range(6):
+        chat.history.append({"role": "user", "content": f"Starý dotaz {i}: " + ("text " * 120)})
+        chat.history.append({"role": "assistant", "content": f"Stará odpověď {i}: " + ("odpoved " * 120)})
+    chat.history.append({"role": "user", "content": "Nejnovější důležitý úkol"})
+
+    _, fit = chat._fit_context(mutate=True)
+    assert fit["evicted_turns"] >= 1
+    assert fit["evicted_memories"] >= 1
+    assert chat.memories.count() < 10
+    assert chat.agent_memory.count() < before_agent
+    assert any(h.get("content") == "Nejnovější důležitý úkol" for h in chat.history)
+
+    info = chat.context_info()
+    assert info["limit"] == 4096
+    assert info["used"] <= info["limit"]
+    assert 0 <= info["pct"] <= 100
+    assert info["evicted_turns"] >= 1
+    assert info["evicted_memories"] >= 1
+
+    # Ruční pročištění po zmenšení kontextu také spolehlivě uvolní staré paměti/tahy
+    compacted = await chat.compact_context(force=True)
+    assert compacted["limit"] == 4096
+
+
+@pytest.mark.asyncio
+async def test_bullet_task_plan_create_plan_remember_and_usage_stream(tmp_path, monkeypatch):
+    import json
+
+    chat = _chat(tmp_path)
+    events = []
+
+    async def capture(ev):
+        events.append(ev)
+
+    chat._emit = capture
+    monkeypatch.setattr(chat.models, "installed", lambda fresh=False: _async_val({"qwen3.5:4b"}))
+
+    # Nasimulujeme streamované odpovědi z Ollamy vč. přesného počtu tokenů v `done: true`
+    responses = [
+        [
+            {"message": {"role": "assistant", "content": "", "tool_calls": [
+                {"function": {"name": "create_plan", "arguments": {
+                    "title": "Architektura migrace",
+                    "summary": "Bezpečná migrace dat a ověření integrity.",
+                    "sections": [
+                        {"heading": "Fáze 1: Záloha", "items": ["Export dat", "Kontrola hashů"]},
+                        {"heading": "Fáze 2: Ověření", "items": ["Spuštění testů"]},
+                    ],
+                }}},
+                {"function": {"name": "task_plan", "arguments": {
+                    "goal": "Migrace dat",
+                    "steps": [
+                        {"title": "Zálohovat data", "status": "done", "section": "Příprava", "items": ["Export JSON"]},
+                        {"title": "Ověřit integritu", "status": "in_progress", "items": ["Kontrola hashů", "Testy"]},
+                    ],
+                }}},
+                {"function": {"name": "remember", "arguments": {"fact": "Záloha patří do D:\\Backups"}}},
+            ]}},
+            {"done": True, "prompt_eval_count": 1420, "eval_count": 80},
+        ],
+        [
+            {"message": {"role": "assistant", "content": "", "tool_calls": [
+                {"function": {"name": "task_plan", "arguments": {"steps": [
+                    {"title": "Zálohovat data", "status": "done", "items": ["Export JSON"]},
+                    {"title": "Ověřit integritu", "status": "done", "items": ["Kontrola hashů", "Testy"]},
+                ]}}},
+                {"function": {"name": "task_done", "arguments": {"summary": "Plán vytvořen, body splněny."}}},
+            ]}},
+            {"done": True, "prompt_eval_count": 1600, "eval_count": 60},
+        ],
+    ]
+    resp_iter = iter(responses)
+
+    class _FakeResp:
+        status_code = 200
+
+        def __init__(self, lines):
+            self._lines = lines
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_a):
+            return False
+
+        async def aiter_lines(self):
+            for ln in self._lines:
+                yield json.dumps(ln)
+
+    class _FakeClient:
+        def __init__(self, **_kw):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_a):
+            return False
+
+        def stream(self, *_a, **_kw):
+            return _FakeResp(next(resp_iter))
+
+    monkeypatch.setattr(httpx, "AsyncClient", _FakeClient)
+
+    chat.settings.update({"autonomous": True})
+    chat.history.append({"role": "user", "content": "Navrhni složitou migraci a splň kroky."})
+    msg = {"id": "ap1", "role": "assistant", "text": "", "thinking": "", "tools": []}
+    await chat._rounds(msg)
+
+    assert msg["doc_plan"]["title"] == "Architektura migrace"
+    assert "## Fáze 1: Záloha" in msg["doc_plan"]["markdown"]
+    assert "- Export dat" in msg["doc_plan"]["markdown"]
+    assert msg["plan"]["steps"][1]["items"] == ["Kontrola hashů", "Testy"]
+    assert msg["text"] == "Plán vytvořen, body splněny."
+    assert "Záloha patří do D:\\Backups" in chat.memories.texts()
+    ctx_events = [e["context"] for e in events if e.get("type") == "context"]
+    assert any(c["used"] == 1660 for c in ctx_events)
+
+
+
 async def _async_val(val):
     return val
 

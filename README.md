@@ -10,7 +10,8 @@ Běží celý u tebe: model, hlas i ovládání. Nic neodchází do cloudu.</p>
 
 - **Chatovat** jako běžný chatbot – odpovědi proudí živě, umí tabulky, kód, vložené obrázky (Ctrl+V / přetažení).
 - **Přemýšlet** – u vyšších úrovní ukazuje své uvažování živě (rozbalovací blok „Přemýšlím…“).
-- **Pracovat autonomně na dlouhých úkolech** – přepínač **Agent** (v poli zprávy i v Nastavení) udrží Jiříka v práci přes desítky kroků: vytvoří si živý seznam kroků (`task_plan`), průběžně ukazuje postup a při předčasném zastavení či neúplném výsledku sám naváže dalším krokem až do ověřeného dokončení.
+- **Pracovat autonomně na dlouhých úkolech** – přepínač **Agent** (v poli zprávy i v Nastavení) udrží Jiříka v práci přes desítky kroků: vytvoří si odrážkový seznam úkolů (`task_plan`), u opravdu složitých zadání sepíše i strukturovanou kartu plánu (`create_plan`), průběžně ukazuje postup a při předčasném zastavení či neúplném výsledku sám naváže dalším krokem až do ověřeného dokončení.
+- **Řídit kontext a paměť** – v Nastavení lze zvolit velikost kontextového okna (`4k`–`64k` nebo vlastní počet tokenů), v záhlaví je vidět živé zaplnění kontextu a při zaplnění Jiřík automaticky uvolní nejstarší tahy i staré vzpomínky (`remember`), aniž by ztratil aktuální cíl a plán.
 - **Ovládat počítač jako člověk** – vidí obrazovku (snímek s očíslovanými prvky a jejich souřadnicemi), hýbe
   myší, kliká, přetahuje, píše, používá zkratky a po každém kroku si ověří nový snímek. Pracuje tak dlouho,
   dokud úkol na obrazovce opravdu není hotový.
@@ -44,7 +45,7 @@ v RAM (~9 tokenů/s). Ultra je na takový počítač příliš velká.
 
 ## Instalace (od nuly)
 
-1. Stáhni si [poslední verzi](../../releases/latest) (`Jirik-v2.1.1-win.zip`) a rozbal ji.
+1. Stáhni si [poslední verzi](../../releases/latest) (`Jirik-v2.2.0-win.zip`) a rozbal ji.
 2. Dvojklik na **`Setup.bat`** (nebo rovnou **`Jirik.bat`**). Samo doinstaluje, co chybí – Python, Node.js, Ollamu (přes winget), knihovny,
    hlas, model pro úroveň Nízká – a vytvoří na ploše ikonu **Jiřík**.
 3. Spusť Jiříka ikonou **Jiřík** na ploše nebo přes **`Jirik.bat`** ve složce. Když instalace ještě neproběhla, aplikace ji při prvním spuštění spustí sama.

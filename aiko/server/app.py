@@ -30,7 +30,7 @@ from .hardware import LEVELS, Hardware
 from .link import Link, firewall_rule_present, network_is_public, open_firewall
 from .models import Models
 from .registry import Registry, dumps
-from .settings import SettingsStore
+from .settings import MAX_CTX, MIN_CTX, SettingsStore, clamp_ctx
 from .voice import Speaker, Voice
 
 log = logging.getLogger("aiko.server")
@@ -139,6 +139,7 @@ class SettingsIn(BaseModel):
     uncensored: bool | None = None
     level: str | None = None
     autonomous: bool | None = None
+    num_ctx: int | None = None
 
 
 class LevelIn(BaseModel):
@@ -185,6 +186,11 @@ def create_app(cfg: Config | None = None) -> FastAPI:
     settings = SettingsStore(cfg.data_dir)
     if settings.value.level not in LEVELS:
         settings.update({"level": "low"})
+    if "num_ctx" in settings.explicit:
+        cfg.num_ctx = cfg.ollama_vlm_num_ctx = clamp_ctx(settings.value.num_ctx)
+    else:
+        cfg.num_ctx = cfg.ollama_vlm_num_ctx = clamp_ctx(cfg.num_ctx)
+        settings.value.num_ctx = cfg.num_ctx
     voice = Voice(cfg)
     speaker = Speaker(voice, hub.send, cfg.data_dir)
     speaker.enabled = settings.value.voice
@@ -306,7 +312,8 @@ def create_app(cfg: Config | None = None) -> FastAPI:
 
     def build_snapshot(status: dict[str, Any], minfo: dict[str, Any]) -> dict[str, Any]:
         return {"type": "snapshot", "settings": settings.value.to_dict(), "status": status, "voice": voice.available,
-                "spaces": {k: {"messages": s.messages, "current": s._current} for k, s in spaces.items()},
+                "spaces": {k: {"messages": s.messages, "current": s._current, "context": s.context_info()}
+                           for k, s in spaces.items()},
                 "models": minfo, "devices": devices(), "nodes": link.public(), "pairing": link.pair_public(),
                 "user_name": cfg.greeting or cfg.user_name}
 
@@ -343,20 +350,37 @@ def create_app(cfg: Config | None = None) -> FastAPI:
     @app.post("/api/settings")
     async def set_settings(body: SettingsIn) -> dict[str, Any]:
         before_model, *_ = await chat.pick()
+        before_ctx = cfg.num_ctx
         changes = {k: v for k, v in body.model_dump().items() if v is not None}
         if "level" in changes and changes["level"] not in LEVELS:
             raise HTTPException(400, "neznámá úroveň")
+        if "num_ctx" in changes:
+            raw_ctx = changes["num_ctx"]
+            if isinstance(raw_ctx, bool) or not (MIN_CTX <= int(raw_ctx) <= MAX_CTX):
+                raise HTTPException(400, f"velikost kontextu musí být {MIN_CTX} až {MAX_CTX}")
+            changes["num_ctx"] = int(raw_ctx)
         new = settings.update(changes)
         speaker.enabled = new.voice
         if not new.voice:
             speaker.hush()
         after_model, *_ = await chat.pick()
         cfg.ollama_vlm_model = after_model
-        if after_model != before_model:
-            asyncio.create_task(chat.warm(unload=before_model))
+        if new.num_ctx != before_ctx:
+            cfg.num_ctx = new.num_ctx
+            cfg.ollama_vlm_num_ctx = new.num_ctx
+            for s in spaces.values():
+                await s.fit_after_resize()
+        if after_model != before_model or (new.num_ctx != before_ctx and not chat.busy):
+            unload = before_model if after_model != before_model else ""
+            asyncio.create_task(chat.warm(unload=unload))
         await hub.send({"type": "settings", "settings": new.to_dict(), "status": await chat.status(),
-                        "models": await models_info()})
+                        "models": await models_info(),
+                        "contexts": {k: s.context_info() for k, s in spaces.items()}})
         return new.to_dict()
+
+    @app.post("/api/context/compact")
+    async def compact_context(body: SpaceIn | None = None) -> dict[str, Any]:
+        return await space(body.space if body else "chat").compact_context(force=True)
 
     # --- modely (úrovně myšlení) ----------------------------------------------------------------
     @app.get("/api/models")

@@ -1,7 +1,7 @@
 {
   "name": "aiko-local",
   "productName": "Jiřík",
-  "version": "2.1.1",
+  "version": "2.2.0",
   "description": "Jiřík – místní AI chat s hlasem, který ovládá tento počítač i spárované počítače",
   "main": "app/main.js",
   "private": true,
