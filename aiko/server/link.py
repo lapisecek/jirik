@@ -21,6 +21,7 @@ import base64
 import hashlib
 import hmac
 import io
+import ipaddress
 import json
 import logging
 import os
@@ -43,22 +44,48 @@ PKG = Path(__file__).resolve().parent.parent
 PAIR_TTL = 15 * 60
 
 
+def _ip_rank(ip: str, primary: str) -> tuple[int, str]:
+    """Upřednostní skutečnou LAN adresu (výchozí brána, 192.168/10) před virtuálními rozhraními (WSL/VPN/VirtualBox)."""
+    if ip == primary:
+        return 0, ip
+    try:
+        addr = ipaddress.IPv4Address(ip)
+    except ValueError:
+        return 9, ip
+    if ip.startswith("192.168.56."):                    # VirtualBox host-only
+        return 6, ip
+    if ipaddress.IPv4Network("100.64.0.0/10").supernet_of(ipaddress.IPv4Network(f"{ip}/32")):
+        return 5, ip                                    # CGNAT / Tailscale
+    if ip.startswith(("192.168.", "10.")):
+        return 1, ip
+    if addr.is_private:                                 # 172.16.0.0/12 (často WSL / Docker / Hyper-V)
+        return 4, ip
+    return 3, ip
+
+
 def local_ips() -> list[str]:
-    ips: list[str] = []
+    primary = ""
+    raw: list[str] = []
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
             s.connect(("192.0.2.1", 9))
-            ips.append(s.getsockname()[0])
+            primary = s.getsockname()[0]
+            if not primary.startswith(("127.", "169.254.")):
+                raw.append(primary)
     except OSError:
         pass
     try:
         for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
             ip = info[4][0]
-            if not ip.startswith(("127.", "169.254.")) and ip not in ips:
-                ips.append(ip)
+            if not ip.startswith(("127.", "169.254.")) and ip not in raw:
+                raw.append(ip)
     except OSError:
         pass
-    return ips
+    return sorted(raw, key=lambda ip: _ip_rank(ip, primary))
+
+
+def _lan_broadcasts() -> set[str]:
+    return {".".join(ip.split(".")[:3] + ["255"]) for ip in local_ips() if ip.count(".") == 3}
 
 
 def magic_packet(mac: str) -> bytes:
@@ -108,6 +135,7 @@ class Pairing:
         self.created = time.time()
         self.state = "waiting"              # waiting → code → confirmed | rejected | done | expired
         self.host = ""
+        self.ip = ""
         self.mac = ""
         self.code = ""
         self.shared = b""
@@ -319,6 +347,8 @@ class Link:
         data = json.dumps(msg).encode()
         self._sent[n] = (nid, time.time())
         targets = {("255.255.255.255", self.cfg.link_udp_port)}
+        for bcast in _lan_broadcasts():
+            targets.add((bcast, self.cfg.link_udp_port))
         if node.get("ip"):
             targets.add((node["ip"], self.cfg.link_udp_port))
         for t in targets:
@@ -336,6 +366,8 @@ class Link:
         except ValueError:
             return False
         targets = {("255.255.255.255", 9), ("255.255.255.255", 7)}
+        for bcast in _lan_broadcasts():
+            targets.add((bcast, 9))
         if node.get("ip"):
             parts = node["ip"].split(".")
             targets.add((".".join(parts[:3] + ["255"]), 9))
@@ -492,15 +524,18 @@ class Link:
         nid = "link-" + secrets.token_hex(4)
         token = secrets.token_hex(32)
         name = " ".join((name or p.host or "Počítač").split())[:40]
-        self.nodes[nid] = {"name": name, "token": token, "ip": "", "mac": p.mac, "host": p.host,
+        self.nodes[nid] = {"name": name, "token": token, "ip": p.ip, "mac": p.mac, "host": p.host,
                            "paired": int(time.time())}
         self._save()
-        conf = {"node_id": nid, "name": name, "token": token, "pin": self.pin, "port": self.cfg.link_port,
+        gw_port = (self._gateway.sockets[0].getsockname()[1]
+                   if self._gateway and getattr(self._gateway, "sockets", None) else self.cfg.link_port)
+        conf = {"node_id": nid, "name": name, "token": token, "pin": self.pin, "port": gw_port,
                 "udp_port": self.cfg.link_udp_port}
         nonce = os.urandom(12)
         ct = AESGCM(pair_key(p.shared, p.sid)).encrypt(nonce, json.dumps(conf).encode(), p.sid.encode())
         p.result = {"nonce": base64.b64encode(nonce).decode(), "data": base64.b64encode(ct).decode()}
         p.state, p.node_id = "confirmed", nid
+        self._send(nid, "ping")
         await self._pair_event()
         await self.changed()
         return {"ok": True, "id": nid}
@@ -539,7 +574,13 @@ class Link:
         if not p or p.expired or len(parts) < 2 or parts[0] != "j" or not hmac.compare_digest(parts[1], p.sid):
             return 404, "text/plain; charset=utf-8", "Párování už neplatí – otevřete ho v Jiříkovi znovu.".encode(), {}
         sub = parts[2] if len(parts) > 2 else ""
-        base = f"http://{host or local_ips()[0]}/j/{p.sid}"
+        peer_ip = str(peer[0]) if isinstance(peer, (tuple, list)) and peer else ""
+        if host:
+            base_host = host if ":" in host or not self.cfg.pair_port else f"{host}:{self.cfg.pair_port}"
+        else:
+            fallback_ip = (local_ips() or ["127.0.0.1"])[0]
+            base_host = f"{fallback_ip}:{self.cfg.pair_port}"
+        base = f"http://{base_host}/j/{p.sid}"
         if method == "GET" and sub == "":
             return 200, "text/html; charset=utf-8", PAGE.replace("{BASE}", base).encode(), {}
         if method == "GET" and sub == "jirik-link.zip":
@@ -562,10 +603,11 @@ class Link:
             p.shared = p.key.exchange(X25519PublicKey.from_public_bytes(node_pub))
             p.code = sas(p.shared, p.pub, node_pub)
             p.host = " ".join(str(d.get("host", ""))[:40].split())
+            p.ip = peer_ip
             mac = str(d.get("mac", ""))
             p.mac = mac if len(mac) == 17 else ""
             p.state = "code"
-            log.info("Párování: %s (%s) ukazuje kód", p.host, peer[0] if peer else "?")
+            log.info("Párování: %s (%s) ukazuje kód", p.host, peer_ip or "?")
             await self._pair_event()
             return 200, "application/json", json.dumps({"pub": base64.b64encode(p.pub).decode()}).encode(), {}
         if method == "GET" and sub == "result":
@@ -573,6 +615,9 @@ class Link:
                 res = json.dumps(p.result).encode()
                 p.state = "done"
                 p.done_at = time.time()
+                if peer_ip and p.node_id in self.nodes and self.nodes[p.node_id].get("ip") != peer_ip:
+                    self.nodes[p.node_id]["ip"] = peer_ip
+                    self._save()
                 await self._pair_event()
                 asyncio.get_running_loop().call_later(2, lambda: asyncio.ensure_future(self.close_pairing()))
                 return 200, "application/json", res, {}
@@ -589,7 +634,7 @@ echo.
 echo   Jiřík Link – instalace na tento počítač
 echo   Stahuji balíček z Jiříka v místní síti…
 echo.
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $ProgressPreference='SilentlyContinue'; $d=Join-Path $env:TEMP 'JirikLink-setup'; if (Test-Path $d) { Remove-Item $d -Recurse -Force }; New-Item -ItemType Directory $d | Out-Null; Invoke-WebRequest '{BASE}/jirik-link.zip' -OutFile (Join-Path $d 'p.zip') -UseBasicParsing; if ((Get-FileHash (Join-Path $d 'p.zip') -Algorithm SHA256).Hash -ne '{HASH}') { throw 'Balíček je poškozený nebo podvržený – instalace zastavena.' }; Expand-Archive (Join-Path $d 'p.zip') $d -Force; & (Join-Path $d 'JirikLink\install.ps1') -PairUrl '{BASE}'"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $ProgressPreference='SilentlyContinue'; try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch {}; $log = Join-Path $env:TEMP 'jirik-link-bootstrap.log'; $d = Join-Path $env:TEMP 'JirikLink-setup'; try { if (Test-Path -LiteralPath $d) { Remove-Item -LiteralPath $d -Recurse -Force }; New-Item -ItemType Directory -Force -Path $d | Out-Null; $zip = Join-Path $d 'p.zip'; $ok = $false; for ($i = 1; $i -le 3 -and -not $ok; $i++) { try { Invoke-WebRequest -Uri '{BASE}/jirik-link.zip' -OutFile $zip -UseBasicParsing -TimeoutSec 30; $ok = (Test-Path -LiteralPath $zip) -and ((Get-Item -LiteralPath $zip).Length -gt 0) } catch { try { (New-Object System.Net.WebClient).DownloadFile('{BASE}/jirik-link.zip', $zip); $ok = (Test-Path -LiteralPath $zip) -and ((Get-Item -LiteralPath $zip).Length -gt 0) } catch { Start-Sleep -Seconds 2 } } }; if (-not $ok) { throw 'Nepodařilo se stáhnout instalační balíček z {BASE}. Zkontrolujte stejnou síť a firewall na hlavním počítači.' }; if ((Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash -ne '{HASH}') { throw 'Balíček je poškozený nebo podvržený – instalace zastavena.' }; try { Add-Type -AssemblyName System.IO.Compression.FileSystem; [System.IO.Compression.ZipFile]::ExtractToDirectory($zip, $d) } catch { Expand-Archive -LiteralPath $zip -DestinationPath $d -Force }; Get-ChildItem -LiteralPath $d -Recurse -ErrorAction SilentlyContinue | Unblock-File -ErrorAction SilentlyContinue; & (Join-Path $d 'JirikLink\install.ps1') -PairUrl '{BASE}'; exit $LASTEXITCODE } catch { $_ | Out-String | Set-Content -LiteralPath $log -Encoding UTF8; Write-Host ''; Write-Host ('  ✗ ' + $_.Exception.Message) -ForegroundColor Red; Write-Host ('    Záznam: ' + $log) -ForegroundColor DarkGray; exit 1 }"
 echo.
 pause
 """
@@ -623,7 +668,8 @@ def firewall_rule_present(cfg: Config) -> bool:
         return True
     try:
         r = subprocess.run(["powershell", "-NoProfile", "-Command",
-                            "$r = Get-NetFirewallRule -DisplayName 'Jirik Link' -ErrorAction SilentlyContinue; "
+                            "$r = Get-NetFirewallRule -DisplayName 'Jirik Link' -ErrorAction SilentlyContinue "
+                            "| Where-Object { $_.Enabled -eq 'True' -and $_.Direction -eq 'Inbound' }; "
                             "if ($r) { ($r | Get-NetFirewallPortFilter).LocalPort -join ',' }"],
                            capture_output=True, text=True, timeout=15,
                            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
@@ -633,14 +679,35 @@ def firewall_rule_present(cfg: Config) -> bool:
         return False
 
 
-def open_firewall(cfg: Config) -> None:
+def network_is_public() -> bool:
+    import subprocess
+    import sys
+
+    if sys.platform != "win32":
+        return False
+    try:
+        r = subprocess.run(["powershell", "-NoProfile", "-Command",
+                            "if (Get-NetConnectionProfile -ErrorAction SilentlyContinue | "
+                            "Where-Object { $_.NetworkCategory -eq 'Public' }) { 'PUBLIC' }"],
+                           capture_output=True, text=True, timeout=10,
+                           creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        return "PUBLIC" in (r.stdout or "")
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+
+def open_firewall(cfg: Config, switch_private: bool = False) -> None:
     """Jednorázově (okno UAC) povolí bránu a párování Jiřík Link – jen z místní podsítě."""
     import subprocess
     import sys
 
     if sys.platform != "win32":
         return
-    rule = ("Remove-NetFirewallRule -DisplayName 'Jirik Link' -ErrorAction SilentlyContinue; "
+    priv = ("Get-NetConnectionProfile -ErrorAction SilentlyContinue | "
+            "Where-Object { $_.NetworkCategory -eq 'Public' } | "
+            "Set-NetConnectionProfile -NetworkCategory Private -ErrorAction SilentlyContinue; "
+            if switch_private else "")
+    rule = (f"{priv}Remove-NetFirewallRule -DisplayName 'Jirik Link' -ErrorAction SilentlyContinue; "
             f"New-NetFirewallRule -DisplayName 'Jirik Link' -Direction Inbound -Protocol TCP "
             f"-LocalPort {int(cfg.link_port)},{int(cfg.pair_port)} -RemoteAddress LocalSubnet "
             "-Profile Private,Domain -Action Allow")

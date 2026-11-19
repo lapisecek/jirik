@@ -27,7 +27,7 @@ from ..common.protocol import AUTH_SCHEME, api_key, auth_proof, new_nonce, proof
 from .chat import Chat
 from .config import Config, load_config
 from .hardware import LEVELS, Hardware
-from .link import Link, firewall_rule_present, open_firewall
+from .link import Link, firewall_rule_present, network_is_public, open_firewall
 from .models import Models
 from .registry import Registry, dumps
 from .settings import SettingsStore
@@ -157,6 +157,10 @@ class PairIn(BaseModel):
 class ConfirmIn(BaseModel):
     ok: bool
     name: str = Field("", max_length=40)
+
+
+class FirewallIn(BaseModel):
+    switch_private: bool = False
 
 
 class Lockout:
@@ -391,10 +395,19 @@ def create_app(cfg: Config | None = None) -> FastAPI:
             p = await link.open_pairing()
         except RuntimeError as e:
             return {"ok": False, "error": str(e)}
-        firewall = await asyncio.to_thread(firewall_rule_present, cfg)
+        firewall, net_pub = await asyncio.gather(
+            asyncio.to_thread(firewall_rule_present, cfg),
+            asyncio.to_thread(network_is_public),
+        )
         if not firewall:
             open_firewall(cfg)
-        return {"ok": True, "pairing": p, "firewall_prompt": not firewall}
+        return {"ok": True, "pairing": p, "firewall_prompt": not firewall,
+                "firewall_ok": firewall, "network_public": net_pub}
+
+    @app.post("/api/link/firewall")
+    async def link_firewall(body: FirewallIn | None = None) -> dict[str, Any]:
+        open_firewall(cfg, switch_private=bool(body and body.switch_private))
+        return {"ok": True}
 
     @app.post("/api/link/pair/confirm")
     async def pair_confirm(body: ConfirmIn) -> dict[str, Any]:

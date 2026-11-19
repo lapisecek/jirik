@@ -87,6 +87,9 @@ def test_fastapi_endpoints_and_guards(tmp_path, monkeypatch):
     import aiko.server.app as app_mod
 
     monkeypatch.setattr(app_mod, "firewall_rule_present", lambda cfg: True)
+    monkeypatch.setattr(app_mod, "network_is_public", lambda: True)
+    fw_calls = []
+    monkeypatch.setattr(app_mod, "open_firewall", lambda cfg, switch_private=False: fw_calls.append(switch_private))
     cfg = Config(data_dir=tmp_path, ollama_url="http://127.0.0.1:1", link_port=0, pair_port=0)
     app = create_app(cfg)
     with TestClient(app, base_url="http://127.0.0.1:8770", client=("127.0.0.1", 50000)) as client:
@@ -106,7 +109,11 @@ def test_fastapi_endpoints_and_guards(tmp_path, monkeypatch):
 
         opened = client.post("/api/link/pair/open").json()
         assert opened["ok"] is True
+        assert opened["firewall_ok"] is True
+        assert opened["network_public"] is True
         assert opened["pairing"]["state"] == "waiting"
+        assert client.post("/api/link/firewall", json={"switch_private": True}).json() == {"ok": True}
+        assert fw_calls == [True]
         assert client.post("/api/link/pair/close").json() == {"ok": True}
         assert app.state.link.pairing is None
 

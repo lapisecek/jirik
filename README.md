@@ -44,7 +44,7 @@ v RAM (~9 tokenů/s). Ultra je na takový počítač příliš velká.
 
 ## Instalace (od nuly)
 
-1. Stáhni si [poslední verzi](../../releases/latest) (`Jirik-v2.1.0-win.zip`) a rozbal ji.
+1. Stáhni si [poslední verzi](../../releases/latest) (`Jirik-v2.1.1-win.zip`) a rozbal ji.
 2. Dvojklik na **`Setup.bat`** (nebo rovnou **`Jirik.bat`**). Samo doinstaluje, co chybí – Python, Node.js, Ollamu (přes winget), knihovny,
    hlas, model pro úroveň Nízká – a vytvoří na ploše ikonu **Jiřík**.
 3. Spusť Jiříka ikonou **Jiřík** na ploše nebo přes **`Jirik.bat`** ve složce. Když instalace ještě neproběhla, aplikace ji při prvním spuštění spustí sama.
@@ -64,6 +64,9 @@ Pak stačí vybrat počítač vlevo a napsat, co na něm udělat. Náhled jeho o
 
 **Jak to funguje:** na druhém počítači běží jen malý hlídač (~13 MB RAM, nulové CPU). Když ho Jiřík potřebuje,
 pošle mu podepsanou zprávu a hlídač spustí plné ovládání, které se po 10 minutách bez práce zase ukončí.
+Pokud příchozí UDP probouzení blokuje firewall nebo Veřejná síť, hlídač automaticky přejde na odchozí
+TLS spojení k Jiříkovi. Instalátor si sám najde nebo nainstaluje Python 3.11+ (včetně ARM64/x64 fallbacku z `python.org`),
+obnoví poškozené `.venv`, přepne po souhlasu síť na Soukromou a zapíše podrobný záznam do `%LOCALAPPDATA%\JirikLink\logs\install.log`.
 Spící počítač Jiřík probudí přes **Wake-on-LAN** (instalátor ho na síťové kartě zapne). Během práce se počítač
 neuspí ani nezhasne obrazovku.
 

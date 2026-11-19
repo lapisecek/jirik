@@ -469,6 +469,8 @@ main { position: relative; min-height: 0; }
 .okmark svg { width: 30px; height: 30px; stroke-dasharray: 30; stroke-dashoffset: 30; animation: draw .5s .25s var(--out) forwards; }
 @keyframes draw { to { stroke-dashoffset: 0; } }
 .tiny { font-size: 12.5px; color: var(--mute); }
+.wz .netwarn { margin: 10px 0 14px; padding: 11px 13px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--warn) 45%, var(--line));
+               background: color-mix(in srgb, var(--warn) 10%, var(--surface)); font-size: 13px; color: var(--ink-2); display: flex; flex-direction: column; gap: 8px; }
 
 /* ============ tlačítka, panel nastavení ============ */
 .btn { height: 36px; padding: 0 15px; border-radius: 11px; font-size: 13.5px; font-weight: 600; display: inline-flex;
@@ -645,7 +647,7 @@ main { position: relative; min-height: 0; }
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const S = { settings: { voice: true, uncensored: false, level: "low", autonomous: true }, status: {}, models: { hardware: {}, levels: [], pulls: {} },
-            devices: [], nodes: [], pairing: null, voiceAvail: true, connected: false, booted: false, userName: "",
+            devices: [], nodes: [], pairing: null, pairingPublicNet: false, pairingFirewallOk: true, voiceAvail: true, connected: false, booted: false, userName: "",
             speaking: null, tab: "chat", target: "local", pendingSelect: null };
 const LVL_IDX = { low: 1, medium: 2, smart: 3, ultra: 4 };
 
@@ -1228,8 +1230,16 @@ function renderWizard() {
   } else if (p.state === "waiting") {
     steps(1);
     const urls = p.urls || [];
+    const netWarn = S.pairingPublicNet
+      ? `<div class="netwarn"><span>Síť na tomto počítači je nastavená jako <b>Veřejná</b> – druhý počítač se nemusí dovolat, dokud ji nepřepneš na Soukromou.</span>
+         <div><button class="btn line sm" data-wz="firewall-private">Přepnout na Soukromou a povolit firewall</button></div></div>`
+      : (!S.pairingFirewallOk
+        ? `<div class="netwarn"><span>Pokud se druhý počítač nemůže připojit, zkontroluj okno firewallu Windows.</span>
+           <div><button class="btn line sm" data-wz="firewall">Povolit firewall znovu</button></div></div>`
+        : "");
     html = `<div class="step"><h2>Otevři odkaz na druhém počítači</h2><p>Do prohlížeče na počítači, který chceš přidat, napiš tuto adresu:</p>
-      ${urls.slice(0, 2).map(u => `<div class="url"><code>${esc(u)}</code><button class="btn line sm" data-copy="${esc(u)}">Kopírovat</button></div>`).join("")}
+      ${urls.slice(0, 4).map(u => `<div class="url"><code>${esc(u)}</code><button class="btn line sm" data-copy="${esc(u)}">Kopírovat</button></div>`).join("")}
+      ${netWarn}
       <ol><li>Stáhni instalátor (prohlížeč se může zeptat – zvol <b>Ponechat</b>).</li><li>Spusť ho dvojklikem – vše potřebné se doinstaluje samo.</li></ol>
       <div class="wait">${I.spinner}<span>Čekám, až se druhý počítač ozve… <span class="tiny" id="wzLeft"></span></span></div>
       <div class="acts"><button class="btn ghost" data-wz="close">Zrušit</button></div></div>`;
@@ -1268,7 +1278,17 @@ $("wzBody").addEventListener("click", async e => {
     const r = await api("/api/link/pair/open").catch(() => ({ ok: false, error: "Server neodpovídá." }));
     if (!r.ok) { toast(r.error || "Párování nejde otevřít."); b.disabled = false; return; }
     if (r.firewall_prompt) toast("Povol prosím ve Windows okno firewallu.");
-    S.pairing = r.pairing; renderWizard(); return;
+    S.pairingPublicNet = !!r.network_public;
+    S.pairingFirewallOk = r.firewall_ok !== false;
+    S.pairing = r.pairing; $("wzBody")._state = ""; renderWizard(); return;
+  }
+  if (a === "firewall" || a === "firewall-private") {
+    const sw = a === "firewall-private";
+    await api("/api/link/firewall", { switch_private: sw }).catch(() => {});
+    toast(sw ? "Potvrď prosím okno UAC pro přepnutí sítě a firewallu." : "Potvrď prosím okno firewallu ve Windows.");
+    if (sw) S.pairingPublicNet = false;
+    S.pairingFirewallOk = true;
+    $("wzBody")._state = ""; renderWizard(); return;
   }
   if (a === "yes" || a === "no") {
     b.disabled = true;
