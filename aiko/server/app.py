@@ -138,6 +138,7 @@ class SettingsIn(BaseModel):
     voice: bool | None = None
     uncensored: bool | None = None
     level: str | None = None
+    autonomous: bool | None = None
 
 
 class LevelIn(BaseModel):

@@ -16,6 +16,7 @@ class Settings:
     voice: bool = True
     uncensored: bool = False
     level: str = "low"              # úroveň myšlení: low | medium | smart | ultra
+    autonomous: bool = True         # autonomní práce: plánování kroků, pokračování a ověření dokončení
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

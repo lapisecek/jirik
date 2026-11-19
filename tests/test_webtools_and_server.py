@@ -95,10 +95,12 @@ def test_fastapi_endpoints_and_guards(tmp_path, monkeypatch):
         assert st["type"] == "snapshot"
         assert "chat" in st["spaces"]
 
-        r = client.post("/api/settings", json={"voice": False, "level": "medium"})
+        r = client.post("/api/settings", json={"voice": False, "level": "medium", "autonomous": False})
         assert r.status_code == 200
         assert r.json()["voice"] is False
         assert r.json()["level"] == "medium"
+        assert r.json()["autonomous"] is False
+        assert client.post("/api/settings", json={"autonomous": True}).json()["autonomous"] is True
 
         assert client.post("/api/settings", json={"level": "invalid"}).status_code == 400
 
